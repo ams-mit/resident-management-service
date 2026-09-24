@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+services:
+  identity:
+    url: http://localhost:9999
+  property:
+    url: http://localhost:9999
+
+gateway:
+  jwt:
+    public-key: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw4lyU6GZ0RfUazXMcJwo
+      UE5DW86WuZud9MTeK/+ZZ1knR1BXAEcHCZB2YWDYIAbGuoCl2ODmZX0zGRMXrssK
+      tasCub8twnJ1eDeBo5iWWVTuty5AUhfsTU7/jqXo1IjHqzF6GuUhRc7YFpPDfyc9
+      Z9m7afXsfdnhobO+095oPZYgu8WEoVlU5EhlHjD87KRo685f6V2RF4c31W60aS8k
+      p0MAyWrJKfIjlGDiI3RUGgQEL4K79hUTjL6n2hrZl7Ac0wVTpSRYyX1xviS9iXTo
+      lQgqapR/eTb3nQrfnqnDPgU1dnr6k6r0ZiXDF6oGkaYzHCtJMitBtXu6p60mV3Y0
+      ywIDAQAB
+      -----END PUBLIC KEY-----

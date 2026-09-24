@@ -1,29 +1,28 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: resident-management-service
   datasource:
-    url: jdbc:h2:mem:ams_resident_db;DB_CLOSE_DELAY=-1
-    username: sa
-    password: 
-    driver-class-name: org.h2.Driver
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.MySQLDialect
   flyway:
-    enabled: false
-
-jwt:
-  secret: ${JWT_SECRET}
-  expirationMs: 86400000
+    enabled: true
+    baseline-on-migrate: true
 
 server:
   port: 8080
+
+gateway:
+  jwt:
+    public-key: ${GATEWAY_JWT_PUBLIC_KEY}

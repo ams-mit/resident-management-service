@@ -17,6 +17,7 @@ public class ApartmentRelationship {
     private String userId;
     
     @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.VARCHAR)
     @Column(nullable = false)
     private RelationshipType relationshipType;
     
@@ -26,6 +27,7 @@ public class ApartmentRelationship {
     private String supportingInfo;
     
     @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.VARCHAR)
     private RelationshipStatus status = RelationshipStatus.PENDING;
     
     private String decisionReason;

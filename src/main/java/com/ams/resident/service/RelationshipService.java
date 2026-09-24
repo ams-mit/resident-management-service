@@ -1,12 +1,12 @@
 package com.ams.resident.service;
 
+import com.ams.resident.client.PropertyClient;
 import com.ams.resident.dto.RelationshipRequest;
 import com.ams.resident.dto.RelationshipResponse;
 import com.ams.resident.entity.ApartmentRelationship;
 import com.ams.resident.entity.RelationshipStatus;
 import com.ams.resident.repository.ApartmentRelationshipRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,10 +19,14 @@ public class RelationshipService {
 
     private final ApartmentRelationshipRepository relationshipRepository;
     private final AuditService auditService;
+    private final PropertyClient propertyClient;
 
     @Transactional
     public RelationshipResponse createRelationshipRequest(RelationshipRequest request) {
         String userId = getAuthenticatedUserId();
+
+        // Validating against external Property Service
+        propertyClient.checkUnitExists(request.getUnitReference());
 
         ApartmentRelationship relationship = new ApartmentRelationship();
         relationship.setUserId(userId);
@@ -45,7 +49,7 @@ public class RelationshipService {
     }
 
     private String getAuthenticatedUserId() {
-        return SecurityContextHolder.getContext().getAuthentication().getName();
+        return com.ams.resident.security.SecurityUtils.getCurrentUserId();
     }
     
     private RelationshipResponse mapToResponse(ApartmentRelationship relationship) {

@@ -24,5 +24,6 @@ public abstract class Profile {
     
     @Column(name = "profile_type", insertable = false, updatable = false)
     @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.VARCHAR)
     private ProfileType profileType;
 }
