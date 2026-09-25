@@ -24,5 +24,16 @@ server:
   port: 8080
 
 gateway:
+  base-url: ${GATEWAY_BASE_URL:http://localhost:8000}
   jwt:
     public-key: ${GATEWAY_JWT_PUBLIC_KEY}
+
+service:
+  name: ${SERVICE_NAME:resident-management-service}
+  jwt:
+    private-key: ${SERVICE_JWT_PRIVATE_KEY:}
+    expires-in: ${SERVICE_JWT_EXPIRES_IN:5m}
+
+client:
+  connect-timeout-ms: ${CLIENT_CONNECT_TIMEOUT_MS:3000}
+  read-timeout-ms: ${CLIENT_READ_TIMEOUT_MS:5000}
