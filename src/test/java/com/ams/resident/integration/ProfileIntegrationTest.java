@@ -5,6 +5,8 @@ import com.ams.resident.config.AbstractIntegrationTest;
 import com.ams.resident.entity.ProfileType;
 import com.ams.resident.entity.ResidentProfile;
 import com.ams.resident.repository.ProfileRepository;
+import com.ams.resident.service.AuditService;
+import com.ams.resident.service.ProfileService;
 import com.ams.resident.util.TestJwtHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +43,9 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
 
     private static final String TEST_USER_ID = "test-user-123";
 
+    @Autowired
+    private ProfileService profileService;
+
     @BeforeEach
     void setUp() {
         profileRepository.deleteAll();
@@ -64,10 +69,92 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldReturn404IfProfileDoesNotExist() throws Exception {
+    void shouldCreateBaselineProfileOnFirstAccess() throws Exception {
+        String newUserId = "brand-new-user-123";
+
         mockMvc.perform(get("/api/v1/profiles/me")
-                        .with(TestJwtHelper.userJwt("non-existent-user")))
-                .andExpect(status().isNotFound());
+                        .with(TestJwtHelper.userJwt(newUserId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(newUserId))
+                .andExpect(jsonPath("$.statusInfo").value("ACTIVE"));
+
+        // Verify Database Persistence
+        var created = profileRepository.findByUserId(newUserId);
+        org.junit.jupiter.api.Assertions.assertTrue(created.isPresent());
+        org.junit.jupiter.api.Assertions.assertEquals(newUserId, created.get().getUserId());
+    }
+
+    @Test
+    void shouldReturnSameProfileOnSecondAccess() throws Exception {
+        String newUserId = "brand-new-user-456";
+
+        // First call creates profile
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(TestJwtHelper.userJwt(newUserId)))
+                .andExpect(status().isOk());
+
+        var firstCreated = profileRepository.findByUserId(newUserId).orElseThrow();
+        String initialId = firstCreated.getId();
+
+        // Second call returns same profile (same id)
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(TestJwtHelper.userJwt(newUserId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(newUserId));
+
+        var secondCreated = profileRepository.findByUserId(newUserId).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(initialId, secondCreated.getId());
+    }
+
+    @Test
+    void shouldCreateAndUpdateProfileOnPutWhenProfileDoesNotExist() throws Exception {
+        String newUserId = "brand-new-user-789";
+        String updatePayload = """
+                {
+                    "firstName": "Alice",
+                    "lastName": "Smith",
+                    "phone": "5551234567"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/profiles/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload)
+                        .with(TestJwtHelper.userJwt(newUserId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(newUserId))
+                .andExpect(jsonPath("$.firstName").value("Alice"))
+                .andExpect(jsonPath("$.lastName").value("Smith"))
+                .andExpect(jsonPath("$.phone").value("5551234567"));
+
+        var profile = profileRepository.findByUserId(newUserId).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals("Alice", profile.getFirstName());
+        org.junit.jupiter.api.Assertions.assertEquals("Smith", profile.getLastName());
+    }
+
+    @Test
+    void shouldHandleConcurrentDuplicateKeyOnCreation() {
+        ProfileRepository mockRepo = org.mockito.Mockito.mock(ProfileRepository.class);
+        AuditService mockAudit = org.mockito.Mockito.mock(AuditService.class);
+        IdentityClient mockIdentity = org.mockito.Mockito.mock(IdentityClient.class);
+        ProfileService service = new ProfileService(mockRepo, mockAudit, mockIdentity);
+
+        String userId = "concurrent-user";
+        ResidentProfile existingProfile = new ResidentProfile();
+        existingProfile.setId("existing-id-123");
+        existingProfile.setUserId(userId);
+
+        org.mockito.Mockito.when(mockRepo.findByUserId(userId))
+                .thenReturn(java.util.Optional.empty())
+                .thenReturn(java.util.Optional.of(existingProfile));
+
+        org.mockito.Mockito.when(mockRepo.saveAndFlush(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate entry"));
+
+        com.ams.resident.entity.Profile result = service.findOrCreateProfile(userId);
+        org.junit.jupiter.api.Assertions.assertNotNull(result);
+        org.junit.jupiter.api.Assertions.assertEquals("existing-id-123", result.getId());
+        org.junit.jupiter.api.Assertions.assertEquals(userId, result.getUserId());
     }
 
     @Test

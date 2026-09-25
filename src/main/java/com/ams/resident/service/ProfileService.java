@@ -5,11 +5,16 @@ import com.ams.resident.dto.EmailChangeRequest;
 import com.ams.resident.dto.ProfileRequest;
 import com.ams.resident.dto.ProfileResponse;
 import com.ams.resident.entity.Profile;
+import com.ams.resident.entity.ProfileType;
+import com.ams.resident.entity.ResidentProfile;
 import com.ams.resident.exception.ResourceNotFoundException;
 import com.ams.resident.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,8 +26,7 @@ public class ProfileService {
 
     public ProfileResponse getOwnProfile() {
         String userId = getAuthenticatedUserId();
-        Profile profile = profileRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Profile not found"));
+        Profile profile = findOrCreateProfile(userId);
 
         return mapToResponse(profile);
     }
@@ -30,8 +34,7 @@ public class ProfileService {
     @Transactional
     public ProfileResponse editOwnProfile(ProfileRequest request) {
         String userId = getAuthenticatedUserId();
-        Profile profile = profileRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Profile not found"));
+        Profile profile = findOrCreateProfile(userId);
 
         profile.setFirstName(request.getFirstName());
         profile.setLastName(request.getLastName());
@@ -42,6 +45,23 @@ public class ProfileService {
         auditService.logEvent("FR-AUD-006", userId, "Updated own profile");
 
         return mapToResponse(profile);
+    }
+
+    public Profile findOrCreateProfile(String userId) {
+        Optional<Profile> existing = profileRepository.findByUserId(userId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        ResidentProfile newProfile = new ResidentProfile();
+        newProfile.setUserId(userId);
+        try {
+            return profileRepository.saveAndFlush(newProfile);
+        } catch (DataIntegrityViolationException ex) {
+            // Concurrent creation: on duplicate, re-read and return the existing row
+            return profileRepository.findByUserId(userId)
+                    .orElseThrow(() -> ex);
+        }
     }
 
     public void requestEmailChange(EmailChangeRequest request) {
