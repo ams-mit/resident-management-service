@@ -14,7 +14,7 @@ This service is fully decentralized and designed to operate as a stateless **OAu
 ## 🏗️ Architecture & Boundaries
 
 - **Stateless Authentication:** The service independently verifies Gateway-issued RS256 JSON Web Tokens using the API Gateway's public key. It does not store passwords or manage user sessions.
-- **Microservice Independence:** The service owns its own MySQL database (`ams_resident_db`) and schema (managed exclusively via Flyway). It strictly prohibits cross-service database access.
+- **Microservice Independence:** The service owns its own MySQL database (`resident_management_db`) and schema (managed exclusively via Flyway). It strictly prohibits cross-service database access.
 - **External Integrations:**
   - **Property Service:** Validates the physical existence of apartment units via synchronous HTTP calls.
   - **Identity Service:** Triggers secure, asynchronous-acting email synchronizations upstream.
@@ -49,7 +49,7 @@ cp .env.example .env
 ```
 
 Ensure the following variables are populated in your `.env` or IDE configuration:
-* `DB_URL` (e.g., `jdbc:mysql://localhost:3306/ams_resident_db`)
+* `DB_URL` (e.g., `jdbc:mysql://localhost:3306/resident_management_db`)
 * `DB_USERNAME` (e.g., `root`)
 * `DB_PASSWORD` (Your local database password)
 * `GATEWAY_JWT_PUBLIC_KEY` (The RSA public key from the API Gateway)
