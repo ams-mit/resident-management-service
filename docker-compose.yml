@@ -1,0 +1,46 @@
+services:
+  resident-management-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: resident-management-service
+    ports:
+      - "${PORT:-8081}:8081"
+    env_file:
+      - .env
+    environment:
+      - PORT=8081
+      - DB_URL=jdbc:mysql://resident-db:3306/resident_management_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-root}
+    depends_on:
+      resident-db:
+        condition: service_healthy
+    networks:
+      - resident-network
+
+  resident-db:
+    image: mysql:8.0
+    container_name: resident-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: resident_management_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - resident-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - resident-network
+
+volumes:
+  resident-db-data:
+
+networks:
+  resident-network:
+    driver: bridge
