@@ -5,6 +5,7 @@ import com.ams.resident.config.AbstractIntegrationTest;
 import com.ams.resident.entity.ProfileType;
 import com.ams.resident.entity.ResidentProfile;
 import com.ams.resident.repository.ProfileRepository;
+import com.ams.resident.util.TestJwtHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -57,7 +57,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldReturnProfileForAuthenticatedUser() throws Exception {
         mockMvc.perform(get("/api/v1/profiles/me")
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("John"))
                 .andExpect(jsonPath("$.lastName").value("Doe"));
@@ -66,7 +66,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldReturn404IfProfileDoesNotExist() throws Exception {
         mockMvc.perform(get("/api/v1/profiles/me")
-                        .with(jwt().jwt(builder -> builder.subject("non-existent-user").claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt("non-existent-user")))
                 .andExpect(status().isNotFound());
     }
 
@@ -83,7 +83,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(put("/api/v1/profiles/me")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload)
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Johnny"))
                 .andExpect(jsonPath("$.lastName").value("Doeson"))
@@ -107,7 +107,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(put("/api/v1/profiles/me")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload)
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.firstName").exists())
                 .andExpect(jsonPath("$.fieldErrors.lastName").exists());
@@ -126,7 +126,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/profiles/me/email-change")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(emailPayload)
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isAccepted());
     }
 
@@ -144,7 +144,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/profiles/me/email-change")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(emailPayload)
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isInternalServerError()); // Custom Exception handler maps Exception to 500, but let's check
     }
 }

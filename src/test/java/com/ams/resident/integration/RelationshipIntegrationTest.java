@@ -6,6 +6,7 @@ import com.ams.resident.entity.ApartmentRelationship;
 import com.ams.resident.entity.RelationshipStatus;
 import com.ams.resident.entity.RelationshipType;
 import com.ams.resident.repository.ApartmentRelationshipRepository;
+import com.ams.resident.util.TestJwtHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,6 @@ import org.springframework.web.client.RestClientException;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -53,7 +53,7 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
 
         String payload = """
                 {
-                    "relationshipType": "TENANT",
+                    "relationshipType": "TENANT_RESIDENT",
                     "unitReference": "UNIT-101",
                     "supportingInfo": "Lease Document attached"
                 }
@@ -62,10 +62,10 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/relationships")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload)
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.relationshipType").value("TENANT"))
+                .andExpect(jsonPath("$.relationshipType").value("TENANT_RESIDENT"))
                 .andExpect(jsonPath("$.unitReference").value("UNIT-101"));
 
         // Verify Persistence
@@ -79,7 +79,7 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
 
         String payload = """
                 {
-                    "relationshipType": "TENANT",
+                    "relationshipType": "TENANT_RESIDENT",
                     "unitReference": "UNIT-999",
                     "supportingInfo": "Lease"
                 }
@@ -88,7 +88,7 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/relationships")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload)
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isServiceUnavailable());
 
         // Verify No Persistence
@@ -105,7 +105,7 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
         relationshipRepository.save(relationship);
 
         mockMvc.perform(get("/api/v1/relationships/me")
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].unitReference").value("UNIT-202"));
@@ -123,7 +123,7 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/relationships")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload)
-                        .with(jwt().jwt(builder -> builder.subject(TEST_USER_ID).claim("type", "user"))))
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isBadRequest()); // Enum validation failure -> HttpMessageNotReadableException
     }
 }
