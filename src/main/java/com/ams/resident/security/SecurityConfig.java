@@ -56,8 +56,8 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/api/v1/profiles/me/**", "/api/v1/relationships/me/**").hasAnyRole("TENANT", "OWNER", "RESIDENT", "APARTMENT_MANAGER", "SYSTEM_ADMIN")
-                .requestMatchers("/api/v1/relationships").hasAnyRole("TENANT", "OWNER", "RESIDENT", "APARTMENT_MANAGER", "SYSTEM_ADMIN")
+                .requestMatchers("/api/v1/profiles/me/**", "/api/v1/relationships/me/**").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
+                .requestMatchers("/api/v1/relationships").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
                 .requestMatchers("/internal/v1/**").authenticated()
                 .anyRequest().authenticated()
             )
@@ -158,7 +158,7 @@ public class SecurityConfig {
         }
     }
 
-    private static class CustomRoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
+    public static class CustomRoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
         @Override
         public Collection<GrantedAuthority> convert(Jwt jwt) {
             List<String> roles = jwt.getClaimAsStringList("roles");

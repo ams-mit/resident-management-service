@@ -73,7 +73,7 @@ public class SecurityRegressionTest {
                         .with(jwt().jwt(builder -> builder
                                 .subject("service-caller")
                                 .claim("type", "service")
-                                .claim("roles", List.of("TENANT")))))
+                                .claim("roles", List.of("TENANT_RESIDENT")))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -83,7 +83,7 @@ public class SecurityRegressionTest {
         mockMvc.perform(get("/api/v1/profiles/me")
                         .with(jwt().jwt(builder -> builder
                                 .subject("user123")
-                                .claim("roles", List.of("TENANT")))))
+                                .claim("roles", List.of("TENANT_RESIDENT")))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -94,7 +94,7 @@ public class SecurityRegressionTest {
                         .with(jwt().jwt(builder -> builder
                                 .subject("user123")
                                 .claim("type", "unknown")
-                                .claim("roles", List.of("TENANT")))))
+                                .claim("roles", List.of("TENANT_RESIDENT")))))
                 .andExpect(status().isUnauthorized());
     }
 
