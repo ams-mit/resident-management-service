@@ -42,7 +42,7 @@ public class ProfileService {
         // Handle fullName mapping if applicable
 
         profile = profileRepository.save(profile);
-        auditService.logEvent("FR-AUD-006", userId, "Updated own profile");
+        auditService.logEvent("FR-AUD-006", "PROFILE", profile.getId(), userId, "Updated own profile");
 
         return mapToResponse(profile);
     }

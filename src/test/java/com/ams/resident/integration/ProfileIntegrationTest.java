@@ -36,6 +36,9 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
     private ProfileRepository profileRepository;
 
     @Autowired
+    private com.ams.resident.repository.AuditEventRepository auditEventRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @MockBean
@@ -48,6 +51,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        auditEventRepository.deleteAll();
         profileRepository.deleteAll();
 
         ResidentProfile profile = new ResidentProfile();
@@ -180,6 +184,17 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         ResidentProfile updated = (ResidentProfile) profileRepository.findByUserId(TEST_USER_ID).orElseThrow();
         assert updated.getFirstName().equals("Johnny");
         assert updated.getPhone().equals("9876543210");
+        org.junit.jupiter.api.Assertions.assertNotNull(updated.getCreatedAt());
+        org.junit.jupiter.api.Assertions.assertNotNull(updated.getUpdatedAt());
+
+        // Verify Audit Event
+        var audits = auditEventRepository.findByActorUserId(TEST_USER_ID);
+        org.junit.jupiter.api.Assertions.assertEquals(1, audits.size());
+        org.junit.jupiter.api.Assertions.assertEquals("FR-AUD-006", audits.get(0).getAction());
+        org.junit.jupiter.api.Assertions.assertEquals(TEST_USER_ID, audits.get(0).getActorUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("PROFILE", audits.get(0).getEntityType());
+        org.junit.jupiter.api.Assertions.assertEquals(updated.getId(), audits.get(0).getEntityId());
+        org.junit.jupiter.api.Assertions.assertNotNull(audits.get(0).getCreatedAt());
     }
 
     @Test

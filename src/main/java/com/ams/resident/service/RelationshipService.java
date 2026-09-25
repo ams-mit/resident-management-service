@@ -33,7 +33,7 @@ public class RelationshipService {
         relationship.setStatus(RelationshipStatus.PENDING);
 
         relationship = relationshipRepository.save(relationship);
-        auditService.logEvent("FR-AUD-004", userId, "Submitted relationship request for unit " + request.getUnitReference());
+        auditService.logEvent("FR-AUD-004", "RELATIONSHIP", relationship.getId(), userId, "Submitted relationship request for unit " + request.getUnitReference());
 
         return mapToResponse(relationship);
     }
