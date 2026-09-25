@@ -55,7 +55,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                 .requestMatchers("/api/v1/profiles/me/**", "/api/v1/relationships/me/**").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
                 .requestMatchers("/api/v1/relationships").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
                 .requestMatchers("/internal/v1/**").authenticated()
