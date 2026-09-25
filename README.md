@@ -56,7 +56,7 @@ Ensure the following variables are populated in your `.env` or IDE configuration
 
 ### 2. Running the Application locally
 
-To start the service on port `8080`:
+To start the service on port `8081`:
 
 ```bash
 ./mvnw clean spring-boot:run
@@ -81,7 +81,7 @@ The canonical and highly detailed API Reference document can be found in the `do
 
 ### Swagger / OpenAPI (Interactive)
 When the application is running, the interactive Swagger documentation is automatically generated at:
-👉 `http://localhost:8080/swagger-ui.html`
+👉 `http://localhost:8081/swagger-ui.html`
 
 ---
 

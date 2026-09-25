@@ -21,7 +21,7 @@ spring:
     baseline-on-migrate: true
 
 server:
-  port: 8080
+  port: ${PORT:8081}
 
 gateway:
   base-url: ${GATEWAY_BASE_URL:http://localhost:8000}
