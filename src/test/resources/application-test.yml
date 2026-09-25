@@ -20,6 +20,7 @@ services:
     url: http://localhost:9999
 
 gateway:
+  base-url: http://localhost:8000
   jwt:
     public-key: |
       -----BEGIN PUBLIC KEY-----

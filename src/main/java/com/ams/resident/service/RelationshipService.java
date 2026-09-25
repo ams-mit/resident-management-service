@@ -25,9 +25,6 @@ public class RelationshipService {
     public RelationshipResponse createRelationshipRequest(RelationshipRequest request) {
         String userId = getAuthenticatedUserId();
 
-        // Validating against external Property Service
-        propertyClient.checkUnitExists(request.getUnitReference());
-
         ApartmentRelationship relationship = new ApartmentRelationship();
         relationship.setUserId(userId);
         relationship.setRelationshipType(request.getRelationshipType());

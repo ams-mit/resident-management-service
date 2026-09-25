@@ -1,5 +1,9 @@
 package com.ams.resident.security;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,17 +13,26 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.server.resource.BearerTokenErrorCodes;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
@@ -45,6 +58,7 @@ public class SecurityConfig {
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/api/v1/profiles/me/**", "/api/v1/relationships/me/**").hasAnyRole("TENANT", "OWNER", "RESIDENT", "APARTMENT_MANAGER", "SYSTEM_ADMIN")
                 .requestMatchers("/api/v1/relationships").hasAnyRole("TENANT", "OWNER", "RESIDENT", "APARTMENT_MANAGER", "SYSTEM_ADMIN")
+                .requestMatchers("/internal/v1/**").authenticated()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
@@ -52,7 +66,8 @@ public class SecurityConfig {
                     .decoder(jwtDecoder())
                     .jwtAuthenticationConverter(jwtAuthenticationConverter())
                 )
-            );
+            )
+            .addFilterAfter(new TokenTypeFilter(), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
@@ -89,12 +104,55 @@ public class SecurityConfig {
         return converter;
     }
 
+    public static class TokenTypeFilter extends OncePerRequestFilter {
+
+        private final BearerTokenAuthenticationEntryPoint authenticationEntryPoint = new BearerTokenAuthenticationEntryPoint();
+
+        @Override
+        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+                throws ServletException, IOException {
+
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth instanceof JwtAuthenticationToken jwtAuth) {
+                String path = request.getRequestURI();
+                String type = jwtAuth.getToken().getClaimAsString("type");
+
+                if (path.startsWith("/api/v1/")) {
+                    if (!"user".equals(type)) {
+                        OAuth2Error error = new OAuth2Error(
+                                BearerTokenErrorCodes.INVALID_TOKEN,
+                                "The access token 'type' claim must be 'user' for /api/v1 endpoints",
+                                null
+                        );
+                        authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
+                        return;
+                    }
+                } else if (path.startsWith("/internal/v1/")) {
+                    if (!"service".equals(type)) {
+                        OAuth2Error error = new OAuth2Error(
+                                BearerTokenErrorCodes.INVALID_TOKEN,
+                                "The access token 'type' claim must be 'service' for /internal/v1 endpoints",
+                                null
+                        );
+                        authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
+                        return;
+                    }
+                }
+            }
+
+            filterChain.doFilter(request, response);
+        }
+    }
+
     private static class JwtTypeValidator implements OAuth2TokenValidator<Jwt> {
         @Override
         public OAuth2TokenValidatorResult validate(Jwt jwt) {
             String type = jwt.getClaimAsString("type");
-            if (type == null || (!type.equals("user") && !type.equals("service"))) {
-                return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid or missing 'type' claim", null));
+            if (type == null) {
+                return OAuth2TokenValidatorResult.failure(new OAuth2Error(BearerTokenErrorCodes.INVALID_TOKEN, "Missing 'type' claim", null));
+            }
+            if (!type.equals("user") && !type.equals("service")) {
+                return OAuth2TokenValidatorResult.failure(new OAuth2Error(BearerTokenErrorCodes.INVALID_TOKEN, "Unknown 'type' claim: " + type, null));
             }
             return OAuth2TokenValidatorResult.success();
         }

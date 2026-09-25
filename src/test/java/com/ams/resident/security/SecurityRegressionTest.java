@@ -65,4 +65,44 @@ public class SecurityRegressionTest {
                         .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_APARTMENT_MANAGER")).jwt(builder -> builder.subject("admin").claim("roles", List.of("APARTMENT_MANAGER")).claim("type", "user"))))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void shouldRejectServiceTokenOnUserApiEndpoint() throws Exception {
+        // a) service token on /api/v1/profiles/me -> 401
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(jwt().jwt(builder -> builder
+                                .subject("service-caller")
+                                .claim("type", "service")
+                                .claim("roles", List.of("TENANT")))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectTokenWithMissingTypeOnUserApiEndpoint() throws Exception {
+        // b) token with missing type -> 401
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(jwt().jwt(builder -> builder
+                                .subject("user123")
+                                .claim("roles", List.of("TENANT")))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectTokenWithUnknownTypeOnUserApiEndpoint() throws Exception {
+        // c) token with unknown type -> 401
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(jwt().jwt(builder -> builder
+                                .subject("user123")
+                                .claim("type", "unknown")
+                                .claim("roles", List.of("TENANT")))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldAllowValidUserTokenOnUserApiEndpoint() throws Exception {
+        // d) valid user token on /api/v1/profiles/me -> not 401
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(com.ams.resident.util.TestJwtHelper.userJwt("user123")))
+                .andExpect(status().isOk());
+    }
 }
