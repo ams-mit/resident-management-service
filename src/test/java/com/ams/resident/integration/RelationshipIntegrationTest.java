@@ -20,6 +20,8 @@ import org.springframework.web.client.RestClientException;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -49,8 +51,6 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldCreateRelationshipWhenUnitExists() throws Exception {
-        doNothing().when(propertyClient).checkUnitExists(anyString());
-
         String payload = """
                 {
                     "relationshipType": "TENANT_RESIDENT",
@@ -70,10 +70,11 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
 
         // Verify Persistence
         assert relationshipRepository.findByUserId(TEST_USER_ID).size() == 1;
+        verify(propertyClient, never()).checkUnitExists(anyString());
     }
 
     @Test
-    void shouldReturn503WhenPropertyServiceFails() throws Exception {
+    void shouldCreateRelationshipEvenWhenPropertyServiceIsDown() throws Exception {
         doThrow(new RestClientException("Property Service Offline"))
                 .when(propertyClient).checkUnitExists(anyString());
 
@@ -89,10 +90,14 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
-                .andExpect(status().isServiceUnavailable());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.relationshipType").value("TENANT_RESIDENT"))
+                .andExpect(jsonPath("$.unitReference").value("UNIT-999"));
 
-        // Verify No Persistence
-        assert relationshipRepository.findByUserId(TEST_USER_ID).isEmpty();
+        // Verify Persistence
+        assert relationshipRepository.findByUserId(TEST_USER_ID).size() == 1;
+        verify(propertyClient, never()).checkUnitExists(anyString());
     }
 
     @Test
