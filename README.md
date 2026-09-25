@@ -5,9 +5,9 @@
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-blue)
 ![Architecture](https://img.shields.io/badge/Architecture-Microservice-orange)
 
-The **Resident Management Service** is a core microservice for the University of Kelaniya Apartment Management System (AMS). It acts as the authoritative boundary for Resident Profiles and Apartment Relationships. 
+The **Resident Management Service** is a core microservice for the University of Kelaniya Apartment Management System (AMS). It acts as the authoritative boundary for Resident Profiles and Apartment Relationships.
 
-This service is fully decentralized and designed to operate as a stateless **OAuth2 Resource Server** sitting behind the project's API Gateway.
+This service operates as a stateless **OAuth2 Resource Server** running on port **8081** sitting behind the project's API Gateway.
 
 ---
 
@@ -37,61 +37,121 @@ This service is fully decentralized and designed to operate as a stateless **OAu
 ### Prerequisites
 * JDK 17
 * Maven (`./mvnw` wrapper included)
-* MySQL 8.0 (If running locally without Docker)
-* Docker (For running automated Testcontainers integration tests)
+* MySQL 8.0 (if running locally without Docker)
+* Docker (for running local Docker Compose or Testcontainers integration tests)
 
 ### 1. Environment Configuration
 
-Copy the sample environment file to `.env` or set these in your OS context:
+Copy the sample environment file to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Ensure the following variables are populated in your `.env` or IDE configuration:
-* `DB_URL` (e.g., `jdbc:mysql://localhost:3306/resident_management_db`)
-* `DB_USERNAME` (e.g., `root`)
-* `DB_PASSWORD` (Your local database password)
-* `GATEWAY_JWT_PUBLIC_KEY` (The RSA public key from the API Gateway)
+The environment variables defined in `.env.example` are:
 
-### 2. Running the Application locally
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | HTTP server port | `8081` |
+| `DB_URL` | MySQL JDBC connection URL | `jdbc:mysql://localhost:3306/resident_management_db` |
+| `DB_USERNAME` | MySQL database username | `root` |
+| `DB_PASSWORD` | MySQL database password | `your_mysql_password` |
+| `GATEWAY_BASE_URL` | API Gateway base URL | `http://localhost:8000` |
+| `GATEWAY_JWT_PUBLIC_KEY` | Base64-encoded RSA public key for verifying user JWTs | *(Required)* |
+| `SERVICE_NAME` | Service identifier for outbound requests | `resident-management-service` |
+| `SERVICE_JWT_PRIVATE_KEY` | Base64 or PEM RSA private key for outbound service JWTs | *(Optional in dev)* |
+| `SERVICE_JWT_EXPIRES_IN` | Outbound JWT expiration duration | `5m` |
+| `CLIENT_CONNECT_TIMEOUT_MS`| HTTP client connection timeout in milliseconds | `3000` |
+| `CLIENT_READ_TIMEOUT_MS` | HTTP client read timeout in milliseconds | `5000` |
 
-To start the service on port `8081`:
+### 2. Running with Docker Compose
+
+To spin up both the service and MySQL 8 using Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+This starts:
+- `resident-db`: MySQL 8 on port `3306` with database `resident_management_db` and healthchecks.
+- `resident-management-service`: Spring Boot application on port `8081`.
+
+### 3. Running Locally
+
+Ensure a MySQL instance is running with database `resident_management_db`, then run:
 
 ```bash
 ./mvnw clean spring-boot:run
 ```
 
-### 3. Running Automated Tests
+On Windows:
+```cmd
+.\mvnw.cmd clean spring-boot:run
+```
 
-The service includes a robust suite of Unit and Integration tests. Integration tests leverage **Testcontainers** to dynamically spin up an isolated MySQL database container during the test phase. 
+### 4. Running Automated Tests
+
+Run unit and integration tests:
+
+```bash
+./mvnw test
+```
+
+Run full verification (including Testcontainers integration tests):
 
 ```bash
 ./mvnw clean verify
 ```
-> **Note:** A running Docker daemon is required for `verify` to successfully execute Testcontainers.
+
+> **Note:** A running Docker daemon is required for Testcontainers integration tests.
 
 ---
 
-## 📚 Documentation
+## 🩺 Health Probes
 
-### API Reference (Static)
-The canonical and highly detailed API Reference document can be found in the `docs` folder:
-👉 [**Resident Management API Reference (v1.0)**](./docs/RESIDENT-MANAGEMENT-API-REFERENCE-v1.0.md)
+Spring Boot Actuator exposes dedicated Kubernetes-compatible health probes (permitted without JWT authentication):
+
+- **Liveness probe:** `GET /actuator/health/liveness` (returns 200 `{"status":"UP"}`)
+- **Readiness probe:** `GET /actuator/health/readiness` (validates database connectivity, returns 200 `{"status":"UP"}`)
+
+No other actuator endpoints are publicly exposed.
+
+---
+
+## 📚 Documentation & API Testing
 
 ### Swagger / OpenAPI (Interactive)
-When the application is running, the interactive Swagger documentation is automatically generated at:
+When the application is running, the interactive Swagger documentation is available at:
 👉 `http://localhost:8081/swagger-ui.html`
+
+### Postman Collection
+A preconfigured Postman collection is available at the root of the repository:
+👉 `Resident-Management-Service.postman_collection.json`
 
 ---
 
 ## 🗄️ Database Migrations
 
-Database schema versioning is enforced via **Flyway**.
+Database schema versioning is managed via **Flyway**.
 Migration scripts are located at:
 `src/main/resources/db/migration/`
 
+- `V1__init_schema.sql`: Initial schema for profiles and apartment relationships.
+- `V2__add_timestamps_and_audit_events.sql`: Adds `created_at` / `updated_at` columns and the `audit_events` table.
+
 The database schema initializes automatically on boot. No manual table creation is required.
+
+---
+
+## 📋 Known Open Items
+
+The following items are pending team/cross-service decisions:
+- **Response envelope format:** Alignment on a standardized API response wrapper across all microservices (e.g., `{ success, data, error }`).
+- **Gateway re-signing vs direct Identity key:** Finalizing whether internal services verify JWTs re-signed by API Gateway or verify tokens directly using Identity Access Service's public key.
+- **Service JWT issuance:** Outbound service-to-service authentication contract and token generation mechanism awaiting team agreement.
+- **Email-change owner:** Clarification on authoritative lifecycle ownership for user email address modifications between Identity Access Service and Resident Management Service.
+- **Notifications ownership:** Architectural ownership of resident notification dispatch upon relationship approvals/rejections.
+- **Group 2 unit contract:** Contract alignment with Group 2 (Property Management) regarding unit reference validation, error response format, and schema semantics.
 
 ---
 *Developed for the University of Kelaniya - Software Architecture and Process Models.*
