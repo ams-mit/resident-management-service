@@ -1,6 +1,0 @@
-com\ams\resident\integration\ProfileIntegrationTest.class
-com\ams\resident\security\SecurityRegressionTest.class
-com\ams\resident\config\AbstractIntegrationTest.class
-com\ams\resident\controller\RelationshipControllerTest.class
-com\ams\resident\controller\ProfileControllerTest.class
-com\ams\resident\integration\RelationshipIntegrationTest.class
