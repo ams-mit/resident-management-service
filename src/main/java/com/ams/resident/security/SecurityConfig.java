@@ -54,6 +54,20 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"Authentication required or invalid token\"}}");
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Access is denied\"}}");
+                })
+            )
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                 .requestMatchers("/api/v1/profiles/me/**", "/api/v1/relationships/me/**").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
@@ -62,6 +76,18 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"Authentication required or invalid token\"}}");
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Access is denied\"}}");
+                })
                 .jwt(jwt -> jwt
                     .decoder(jwtDecoder())
                     .jwtAuthenticationConverter(jwtAuthenticationConverter())
@@ -106,8 +132,6 @@ public class SecurityConfig {
 
     public static class TokenTypeFilter extends OncePerRequestFilter {
 
-        private final BearerTokenAuthenticationEntryPoint authenticationEntryPoint = new BearerTokenAuthenticationEntryPoint();
-
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
                 throws ServletException, IOException {
@@ -119,22 +143,18 @@ public class SecurityConfig {
 
                 if (path.startsWith("/api/v1/")) {
                     if (!"user".equals(type)) {
-                        OAuth2Error error = new OAuth2Error(
-                                BearerTokenErrorCodes.INVALID_TOKEN,
-                                "The access token 'type' claim must be 'user' for /api/v1 endpoints",
-                                null
-                        );
-                        authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.setCharacterEncoding("UTF-8");
+                        response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"The access token 'type' claim must be 'user' for /api/v1 endpoints\"}}");
                         return;
                     }
                 } else if (path.startsWith("/internal/v1/")) {
                     if (!"service".equals(type)) {
-                        OAuth2Error error = new OAuth2Error(
-                                BearerTokenErrorCodes.INVALID_TOKEN,
-                                "The access token 'type' claim must be 'service' for /internal/v1 endpoints",
-                                null
-                        );
-                        authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.setCharacterEncoding("UTF-8");
+                        response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"The access token 'type' claim must be 'service' for /internal/v1 endpoints\"}}");
                         return;
                     }
                 }

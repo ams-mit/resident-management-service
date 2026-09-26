@@ -211,8 +211,8 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                         .content(updatePayload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors.firstName").exists())
-                .andExpect(jsonPath("$.fieldErrors.lastName").exists());
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test

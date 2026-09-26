@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
@@ -40,7 +41,9 @@ public class SecurityRegressionTest {
     @Test
     void shouldReturnUnauthorizedWhenNoToken() throws Exception {
         mockMvc.perform(get("/api/v1/profiles/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -48,7 +51,9 @@ public class SecurityRegressionTest {
         mockMvc.perform(get("/api/v1/residents")
                         .with(jwt().jwt(builder -> builder.subject("user123").claim("type", "user"))))
                 // The Resident GET API requires APARTMENT_MANAGER or SYSTEM_ADMIN. A plain token without roles will be forbidden.
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -74,7 +79,8 @@ public class SecurityRegressionTest {
                                 .subject("service-caller")
                                 .claim("type", "service")
                                 .claim("roles", List.of("TENANT_RESIDENT")))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -84,7 +90,8 @@ public class SecurityRegressionTest {
                         .with(jwt().jwt(builder -> builder
                                 .subject("user123")
                                 .claim("roles", List.of("TENANT_RESIDENT")))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -95,7 +102,8 @@ public class SecurityRegressionTest {
                                 .subject("user123")
                                 .claim("type", "unknown")
                                 .claim("roles", List.of("TENANT_RESIDENT")))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
