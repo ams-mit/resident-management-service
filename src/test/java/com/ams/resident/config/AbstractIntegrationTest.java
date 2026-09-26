@@ -15,7 +15,7 @@ public abstract class AbstractIntegrationTest {
 
     @Container
     static MySQLContainer<?> mySQLContainer = new MySQLContainer<>("mysql:8.0.33")
-            .withDatabaseName("ams_resident_db_test")
+            .withDatabaseName("resident_management_db_test")
             .withUsername("testuser")
             .withPassword("testpass");
 

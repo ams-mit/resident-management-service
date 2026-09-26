@@ -37,6 +37,9 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
     private ApartmentRelationshipRepository relationshipRepository;
 
     @Autowired
+    private com.ams.resident.repository.AuditEventRepository auditEventRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @MockBean
@@ -46,6 +49,7 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        auditEventRepository.deleteAll();
         relationshipRepository.deleteAll();
     }
 
@@ -69,8 +73,21 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.unitReference").value("UNIT-101"));
 
         // Verify Persistence
-        assert relationshipRepository.findByUserId(TEST_USER_ID).size() == 1;
+        var relationships = relationshipRepository.findByUserId(TEST_USER_ID);
+        assert relationships.size() == 1;
+        var savedRelationship = relationships.get(0);
+        org.junit.jupiter.api.Assertions.assertNotNull(savedRelationship.getCreatedAt());
+        org.junit.jupiter.api.Assertions.assertNotNull(savedRelationship.getUpdatedAt());
         verify(propertyClient, never()).checkUnitExists(anyString());
+
+        // Verify Audit Event
+        var audits = auditEventRepository.findByActorUserId(TEST_USER_ID);
+        org.junit.jupiter.api.Assertions.assertEquals(1, audits.size());
+        org.junit.jupiter.api.Assertions.assertEquals("FR-AUD-004", audits.get(0).getAction());
+        org.junit.jupiter.api.Assertions.assertEquals(TEST_USER_ID, audits.get(0).getActorUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("RELATIONSHIP", audits.get(0).getEntityType());
+        org.junit.jupiter.api.Assertions.assertEquals(savedRelationship.getId(), audits.get(0).getEntityId());
+        org.junit.jupiter.api.Assertions.assertNotNull(audits.get(0).getCreatedAt());
     }
 
     @Test
