@@ -215,9 +215,12 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error.message").exists());
     }
 
+    @Autowired
+    private com.ams.resident.repository.EmailChangeRequestRepository emailChangeRequestRepository;
+
     @Test
-    void shouldForwardEmailChangeSuccessfully() throws Exception {
-        doNothing().when(identityClient).requestEmailChange(anyString(), anyString());
+    void shouldStorePendingEmailChangeRequestWithHashedToken() throws Exception {
+        emailChangeRequestRepository.deleteAll();
 
         String emailPayload = """
                 {
@@ -225,28 +228,46 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/profiles/me/email-change")
+        org.springframework.test.web.servlet.MvcResult result = mockMvc.perform(post("/api/v1/profiles/me/email-change")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(emailPayload)
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.message").value("Verification required"))
+                .andExpect(jsonPath("$.meta").isMap())
+                .andReturn();
+
+        // Verify raw token never appears in response body
+        String responseContent = result.getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertFalse(responseContent.contains("token"));
+
+        // Verify row saved in DB with hash
+        java.util.List<com.ams.resident.entity.EmailChangeRequestEntity> requests =
+                emailChangeRequestRepository.findAll().stream()
+                        .filter(r -> TEST_USER_ID.equals(r.getUserId()))
+                        .toList();
+        org.junit.jupiter.api.Assertions.assertEquals(1, requests.size());
+        com.ams.resident.entity.EmailChangeRequestEntity saved = requests.get(0);
+        org.junit.jupiter.api.Assertions.assertEquals("new@example.com", saved.getNewEmail());
+        org.junit.jupiter.api.Assertions.assertNotNull(saved.getTokenHash());
+        org.junit.jupiter.api.Assertions.assertEquals(64, saved.getTokenHash().length());
+        org.junit.jupiter.api.Assertions.assertNull(saved.getUsedAt());
+        org.junit.jupiter.api.Assertions.assertTrue(saved.getExpiresAt().isAfter(java.time.LocalDateTime.now()));
+
+        // Invalidate older unused request when a new one is requested
+        String secondPayload = """
+                {
+                    "newEmail": "second@example.com"
+                }
+                """;
+        mockMvc.perform(post("/api/v1/profiles/me/email-change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(secondPayload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isAccepted());
-    }
 
-    @Test
-    void shouldReturn503WhenIdentityServiceFails() throws Exception {
-        doThrow(new RuntimeException("Identity service offline"))
-                .when(identityClient).requestEmailChange(anyString(), anyString());
-
-        String emailPayload = """
-                {
-                    "newEmail": "new@example.com"
-                }
-                """;
-
-        mockMvc.perform(post("/api/v1/profiles/me/email-change")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(emailPayload)
-                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
-                .andExpect(status().isInternalServerError()); // Custom Exception handler maps Exception to 500, but let's check
+        com.ams.resident.entity.EmailChangeRequestEntity firstRequest =
+                emailChangeRequestRepository.findById(saved.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(firstRequest.getExpiresAt().isBefore(java.time.LocalDateTime.now().plusSeconds(1)));
     }
 }

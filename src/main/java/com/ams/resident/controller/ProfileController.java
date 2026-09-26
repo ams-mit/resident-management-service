@@ -46,8 +46,9 @@ public class ProfileController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid email format")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
     @PostMapping("/email-change")
-    public ResponseEntity<Void> requestEmailChange(@Valid @RequestBody EmailChangeRequest request) {
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> requestEmailChange(@Valid @RequestBody EmailChangeRequest request) {
         profileService.requestEmailChange(request);
-        return ResponseEntity.accepted().build();
+        return ResponseEntity.status(org.springframework.http.HttpStatus.ACCEPTED)
+                .body(ApiResponse.of(java.util.Map.of("message", "Verification required")));
     }
 }
