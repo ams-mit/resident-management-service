@@ -106,6 +106,37 @@ public class ProfileService {
         auditService.logEvent("EMAIL_CHANGE_REQUESTED", userId, "Requested email change to: " + request.getNewEmail());
     }
 
+    @Transactional
+    public void confirmEmailChange(com.ams.resident.dto.EmailChangeConfirmRequest request) {
+        String userId = getAuthenticatedUserId();
+        String tokenHash = TokenUtils.hashToken(request.getVerificationToken());
+
+        // Find request by token hash AND userId from JWT sub
+        java.util.Optional<EmailChangeRequestEntity> optRequest =
+                emailChangeRequestRepository.findByTokenHashAndUserId(tokenHash, userId);
+
+        if (optRequest.isEmpty()) {
+            throw new com.ams.resident.exception.BadRequestException("INVALID_VERIFICATION_TOKEN", "Invalid or expired verification token");
+        }
+
+        EmailChangeRequestEntity changeRequest = optRequest.get();
+        LocalDateTime now = LocalDateTime.now();
+
+        // Must be unused and not expired
+        if (changeRequest.getUsedAt() != null || changeRequest.getExpiresAt().isBefore(now)) {
+            throw new com.ams.resident.exception.BadRequestException("INVALID_VERIFICATION_TOKEN", "Invalid or expired verification token");
+        }
+
+        // Call identity via IdentityClient
+        identityClient.updateUserEmail(userId, changeRequest.getNewEmail());
+
+        // Identity 200 -> mark request used, audit EMAIL_CHANGED
+        changeRequest.setUsedAt(now);
+        emailChangeRequestRepository.save(changeRequest);
+
+        auditService.logEvent("EMAIL_CHANGED", userId, "Email successfully changed to: " + changeRequest.getNewEmail());
+    }
+
     private String getAuthenticatedUserId() {
         return com.ams.resident.security.SecurityUtils.getCurrentUserId();
     }

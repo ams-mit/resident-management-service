@@ -51,4 +51,17 @@ public class ProfileController {
         return ResponseEntity.status(org.springframework.http.HttpStatus.ACCEPTED)
                 .body(ApiResponse.of(java.util.Map.of("message", "Verification required")));
     }
+
+    @Operation(summary = "Confirm email change", description = "Confirms a pending email change using a verification token.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Email updated successfully")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid or expired verification token")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Email already in use")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Identity service unavailable")
+    @PutMapping("/email-change/confirm")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> confirmEmailChange(
+            @Valid @RequestBody com.ams.resident.dto.EmailChangeConfirmRequest request) {
+        profileService.confirmEmailChange(request);
+        return ResponseEntity.ok(ApiResponse.of(java.util.Map.of("message", "Email updated")));
+    }
 }
