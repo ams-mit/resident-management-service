@@ -130,6 +130,83 @@ A preconfigured Postman collection is available at the root of the repository:
 
 ---
 
+## 📦 Response Format
+
+All responses from `/api/v1/**` and `/internal/v1/**` follow the unified response envelopes aligned with `identity-access-service`.
+
+### 1. Success Response (Single / Unpaged)
+Endpoints returning a single entity or unpaged collections wrap their payload under `data`, with `meta` defaulting to an empty JSON object `{}`:
+```json
+{
+  "data": {
+    "userId": "usr_12345",
+    "profileType": "RESIDENT",
+    "firstName": "John",
+    "lastName": "Doe",
+    "phone": "+1234567890",
+    "statusInfo": "ACTIVE"
+  },
+  "meta": {}
+}
+```
+
+### 2. Paged List Response
+Endpoints supporting pagination (e.g. `GET /api/v1/residents?page=0&size=20`) return a list under `data` and standard metadata under `meta` with `page`, `size`, and `totalElements`:
+```json
+{
+  "data": [
+    {
+      "id": "res_123",
+      "userId": "usr_12345",
+      "profileType": "RESIDENT",
+      "firstName": "John",
+      "lastName": "Doe",
+      "phone": "+1234567890",
+      "emergencyContact": "Jane Doe - 0987654321"
+    }
+  ],
+  "meta": {
+    "page": 0,
+    "size": 20,
+    "totalElements": 1
+  }
+}
+```
+
+### 3. Error Response
+All error responses (400, 401, 403, 404, 409, 500, 503) return a standardized `{ "error": { "code", "message" } }` envelope. 500 errors never leak stack traces or SQL details.
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Page index must not be negative"
+  }
+}
+```
+
+---
+
+## ✉️ Email Change Flow (US-G1-18)
+
+The email change flow allows users to securely update their primary email address across services:
+1. **Initiate Request:**
+   - User submits `POST /api/v1/profiles/me/email-change` with `{ "newEmail": "new@example.com" }`.
+   - The service generates a cryptographically secure token (at least 32 bytes, URL-safe) and stores only its SHA-256 hash in `email_change_requests` with a 24-hour expiration.
+   - Any prior unused requests for the user are invalidated.
+   - Real email transmission is out of scope (Case Scope §13). The raw token is logged **ONCE** at INFO level with prefix `[DEV-ONLY]` for testing and demonstration purposes (e.g. `[DEV-ONLY] Email change verification token for user ...`). The raw token is never returned in any API response.
+   - Returns `202 Accepted` with `{ "data": { "message": "Verification required" }, "meta": {} }`.
+   - Records audit event `EMAIL_CHANGE_REQUESTED` (no token in details).
+2. **Confirm Request:**
+   - User submits `PUT /api/v1/profiles/me/email-change/confirm` with `{ "verificationToken": "..." }`.
+   - The token hash is verified against the user's active, unexpired, and unused request for their authenticated user ID.
+   - Invalid, expired, used, or cross-user tokens return `400` with code `INVALID_VERIFICATION_TOKEN`.
+   - The service issues an internal call to `identity-access-service` via `PUT /internal/v1/users/{userId}/email` with `{ "newEmail": "..." }` and a signed Service JWT.
+   - On `200 OK` from identity, the request is marked as used, an `EMAIL_CHANGED` audit event is logged, and `200 OK` is returned with `{ "data": { "message": "Email updated" }, "meta": {} }`.
+   - On `409 Conflict` (email already in use), returns `409` (`EMAIL_ALREADY_IN_USE`) while keeping the request unused.
+   - On identity unavailability, timeout, or 5xx, returns `503` (`DEPENDENCY_UNAVAILABLE`) while keeping the request unused for retry.
+
+---
+
 ## 🗄️ Database Migrations
 
 Database schema versioning is managed via **Flyway**.
