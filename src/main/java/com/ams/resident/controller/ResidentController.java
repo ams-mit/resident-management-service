@@ -16,9 +16,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import com.ams.resident.dto.ApiResponse;
+import com.ams.resident.dto.PagedMeta;
+import com.ams.resident.exception.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 @RestController
 @RequestMapping("/api/v1/residents")
@@ -40,13 +44,31 @@ public class ResidentController {
         return new ResponseEntity<>(ApiResponse.of(response), HttpStatus.CREATED);
     }
 
-    @Operation(summary = "Get all residents", description = "Retrieve a list of all residents. Required Role: APARTMENT_MANAGER or SYSTEM_ADMIN.")
+    @Operation(summary = "Get all residents", description = "Retrieve a list of all residents with pagination. Required Role: APARTMENT_MANAGER or SYSTEM_ADMIN.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Residents retrieved successfully")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid pagination parameters")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions")
     @GetMapping
     @PreAuthorize("hasAnyRole('APARTMENT_MANAGER', 'SYSTEM_ADMIN')")
-    public ResponseEntity<ApiResponse<List<ResidentResponse>>> getResidents() {
-        return ResponseEntity.ok(ApiResponse.of(residentService.getAllResidents()));
+    public ResponseEntity<ApiResponse<List<ResidentResponse>>> getResidents(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        if (page < 0) {
+            throw new BadRequestException("VALIDATION_ERROR", "Page index must not be negative");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("VALIDATION_ERROR", "Page size must be between 1 and 100");
+        }
+
+        Page<ResidentResponse> pagedResidents = residentService.getAllResidents(PageRequest.of(page, size));
+
+        PagedMeta meta = PagedMeta.builder()
+                .page(pagedResidents.getNumber())
+                .size(pagedResidents.getSize())
+                .totalElements(pagedResidents.getTotalElements())
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.of(pagedResidents.getContent(), meta));
     }
 
     @Operation(summary = "Get resident by ID", description = "Retrieve a specific resident profile. Accessible by the resident themselves or Administrators.")

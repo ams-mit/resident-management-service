@@ -48,6 +48,11 @@ public class ResidentService {
                 .collect(Collectors.toList());
     }
 
+    public org.springframework.data.domain.Page<ResidentResponse> getAllResidents(org.springframework.data.domain.Pageable pageable) {
+        return residentRepository.findAll(pageable)
+                .map(this::mapToResponse);
+    }
+
     public ResidentResponse getResidentById(String id) {
         ResidentProfile resident = residentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resident profile not found with ID: " + id));
