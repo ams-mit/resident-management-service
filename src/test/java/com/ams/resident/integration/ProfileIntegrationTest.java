@@ -68,8 +68,8 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/profiles/me")
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.firstName").value("John"))
-                .andExpect(jsonPath("$.lastName").value("Doe"));
+                .andExpect(jsonPath("$.data.firstName").value("John"))
+                .andExpect(jsonPath("$.data.lastName").value("Doe"));
     }
 
     @Test
@@ -176,9 +176,9 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                         .content(updatePayload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.firstName").value("Johnny"))
-                .andExpect(jsonPath("$.lastName").value("Doeson"))
-                .andExpect(jsonPath("$.phone").value("9876543210"));
+                .andExpect(jsonPath("$.data.firstName").value("Johnny"))
+                .andExpect(jsonPath("$.data.lastName").value("Doeson"))
+                .andExpect(jsonPath("$.data.phone").value("9876543210"));
 
         // Verify Database Persistence
         ResidentProfile updated = (ResidentProfile) profileRepository.findByUserId(TEST_USER_ID).orElseThrow();
