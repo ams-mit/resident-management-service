@@ -79,8 +79,8 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/profiles/me")
                         .with(TestJwtHelper.userJwt(newUserId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(newUserId))
-                .andExpect(jsonPath("$.statusInfo").value("ACTIVE"));
+                .andExpect(jsonPath("$.data.userId").value(newUserId))
+                .andExpect(jsonPath("$.data.statusInfo").value("ACTIVE"));
 
         // Verify Database Persistence
         var created = profileRepository.findByUserId(newUserId);
@@ -104,7 +104,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/profiles/me")
                         .with(TestJwtHelper.userJwt(newUserId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(newUserId));
+                .andExpect(jsonPath("$.data.userId").value(newUserId));
 
         var secondCreated = profileRepository.findByUserId(newUserId).orElseThrow();
         org.junit.jupiter.api.Assertions.assertEquals(initialId, secondCreated.getId());
@@ -126,10 +126,10 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                         .content(updatePayload)
                         .with(TestJwtHelper.userJwt(newUserId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(newUserId))
-                .andExpect(jsonPath("$.firstName").value("Alice"))
-                .andExpect(jsonPath("$.lastName").value("Smith"))
-                .andExpect(jsonPath("$.phone").value("5551234567"));
+                .andExpect(jsonPath("$.data.userId").value(newUserId))
+                .andExpect(jsonPath("$.data.firstName").value("Alice"))
+                .andExpect(jsonPath("$.data.lastName").value("Smith"))
+                .andExpect(jsonPath("$.data.phone").value("5551234567"));
 
         var profile = profileRepository.findByUserId(newUserId).orElseThrow();
         org.junit.jupiter.api.Assertions.assertEquals("Alice", profile.getFirstName());
