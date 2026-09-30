@@ -51,7 +51,7 @@ public class GlobalExceptionHandler {
                 .filter(StringUtils::hasText)
                 .collect(Collectors.joining(", "));
         if (!StringUtils.hasText(message)) {
-            message = "Validation failed";
+            message = "Validation failed for request";
         }
         return new ResponseEntity<>(ApiErrorResponse.of("VALIDATION_ERROR", message), HttpStatus.BAD_REQUEST);
     }
@@ -64,7 +64,7 @@ public class GlobalExceptionHandler {
                 .filter(Objects::nonNull)
                 .collect(Collectors.joining(", "));
         if (!StringUtils.hasText(message)) {
-            message = "Validation failed";
+            message = "Validation failed for request";
         }
         return new ResponseEntity<>(ApiErrorResponse.of("VALIDATION_ERROR", message), HttpStatus.BAD_REQUEST);
     }
