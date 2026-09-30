@@ -1,509 +1,747 @@
 openapi: 3.0.3
 info:
   title: Resident Management Service API
-  description: API for managing resident profiles, apartment relationships, and inter-service relationship verification in the Apartment Management System (Group 1).
+  description: Canonical target-state API documentation for Resident Management Service in Project A (Group 1 - Apartment Identity and Resident Management).
   version: 1.0.0
 servers:
   - url: http://localhost:8081
     description: Local development server
+  - url: http://localhost:8000
+    description: API Gateway route
 
 paths:
-  /api/v1/profiles/me:
+  /api/v1/residents:
     get:
       tags:
-        - Profiles
-      summary: Get own profile
-      description: Retrieves the profile of the currently authenticated user. Lazy-creates baseline profile if none exists.
+        - Residents
+      summary: "RES-001: List resident profiles"
+      description: Retrieve paginated resident profiles. Requires User JWT with role SYSTEM_ADMINISTRATOR or APARTMENT_MANAGER.
       security:
-        - UserJwtAuth: []
-      responses:
-        '200':
-          description: Profile retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProfileApiResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '404':
-          description: Profile not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-    put:
-      tags:
-        - Profiles
-      summary: Edit own profile
-      description: Updates the profile of the currently authenticated user.
-      security:
-        - UserJwtAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProfileRequest'
-      responses:
-        '200':
-          description: Profile updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProfileApiResponse'
-        '400':
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '404':
-          description: Profile not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-
-  /api/v1/profiles/me/email-change:
-    post:
-      tags:
-        - Profiles
-      summary: Request email change
-      description: Initiates a request to change the user's primary email. Logs verification token for local dev and stores hashed token.
-      security:
-        - UserJwtAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EmailChangeRequest'
-      responses:
-        '202':
-          description: Verification required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MessageApiResponse'
-        '400':
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-
-  /api/v1/profiles/me/email-change/confirm:
-    put:
-      tags:
-        - Profiles
-      summary: Confirm email change
-      description: Confirms an email change request using a verification token and updates identity-access-service.
-      security:
-        - UserJwtAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EmailChangeConfirmRequest'
-      responses:
-        '200':
-          description: Email updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MessageApiResponse'
-        '400':
-          description: Invalid or expired verification token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '409':
-          description: Email already in use
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '503':
-          description: Identity dependency unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-
-  /api/v1/profiles/{userId}:
-    get:
-      tags:
-        - Profiles (Admin)
-      summary: Get user profile by ID
-      description: Retrieves the profile of a specific user. Restricted to SYSTEM_ADMINISTRATOR.
-      security:
-        - UserJwtAuth: []
+        - BearerAuth: []
       parameters:
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: ID of user whose profile is to be retrieved
-      responses:
-        '200':
-          description: Profile retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProfileApiResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '403':
-          description: Forbidden - Insufficient permissions
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '404':
-          description: Profile not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-
-  /api/v1/relationships:
-    post:
-      tags:
-        - Relationships
-      summary: Create relationship request
-      description: Submit a request to establish a relationship with an apartment unit.
-      security:
-        - UserJwtAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RelationshipRequest'
-      responses:
-        '201':
-          description: Relationship request created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RelationshipApiResponse'
-        '400':
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-    get:
-      tags:
-        - Relationships (Admin)
-      summary: List relationships
-      description: Paged list of relationship requests with optional status filtering. Restricted to SYSTEM_ADMINISTRATOR.
-      security:
-        - UserJwtAuth: []
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [PENDING, APPROVED, REJECTED]
-          description: Filter by request status
         - name: page
           in: query
+          description: Page number (0-indexed, default 0)
           required: false
           schema:
             type: integer
             default: 0
             minimum: 0
-          description: Zero-based page index
         - name: size
           in: query
+          description: Page size (1-100, default 20)
           required: false
           schema:
             type: integer
             default: 20
             minimum: 1
             maximum: 100
-          description: Page size (1 to 100)
+        - name: status
+          in: query
+          description: Filter by profile status (ACTIVE, INACTIVE, ARCHIVED)
+          required: false
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, ARCHIVED]
+        - name: search
+          in: query
+          description: Search term across firstName, lastName, or email
+          required: false
+          schema:
+            type: string
+        - name: userId
+          in: query
+          description: Filter by Identity Access user ID (UUID)
+          required: false
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
-          description: Paged list of relationships
+          description: Residents retrieved successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PagedRelationshipApiResponse'
+                $ref: '#/components/schemas/PagedResidentResponse'
         '400':
-          description: Invalid query parameters
+          description: Validation error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '401':
-          description: Unauthorized
+          description: Invalid token
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '403':
-          description: Forbidden - Insufficient permissions
+          description: Permission denied
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
-
-  /api/v1/relationships/me:
-    get:
+    post:
       tags:
-        - Relationships
-      summary: Get own relationships
-      description: Retrieves all apartment relationships for the currently authenticated user.
+        - Residents
+      summary: "RES-002: Create resident profile"
+      description: Creates a new resident profile. Validates user existence with identity-access-service via internal API.
       security:
-        - UserJwtAuth: []
-      responses:
-        '200':
-          description: Relationships retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RelationshipListApiResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-
-  /api/v1/relationships/{id}:
-    get:
-      tags:
-        - Relationships (Admin)
-      summary: Get relationship by ID
-      description: Retrieves details of an apartment relationship request including unitValidation placeholder. Restricted to SYSTEM_ADMINISTRATOR.
-      security:
-        - UserJwtAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Relationship ID
-      responses:
-        '200':
-          description: Relationship retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RelationshipApiResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '403':
-          description: Forbidden - Insufficient permissions
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '404':
-          description: Relationship not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-
-  /api/v1/relationships/{id}/approve:
-    patch:
-      tags:
-        - Relationships (Admin)
-      summary: Approve relationship
-      description: Approves a pending relationship request and logs FR-AUD-005 audit event. Restricted to SYSTEM_ADMINISTRATOR.
-      security:
-        - UserJwtAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Relationship ID
-      responses:
-        '200':
-          description: Relationship approved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RelationshipApiResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '403':
-          description: Forbidden - Insufficient permissions
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '404':
-          description: Relationship not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '409':
-          description: Relationship already decided
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-
-  /api/v1/relationships/{id}/reject:
-    patch:
-      tags:
-        - Relationships (Admin)
-      summary: Reject relationship
-      description: Rejects a pending relationship request with mandatory reason and logs FR-AUD-005 audit event. Restricted to SYSTEM_ADMINISTRATOR.
-      security:
-        - UserJwtAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Relationship ID
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RelationshipRejectRequest'
+              $ref: '#/components/schemas/CreateProfileRequest'
       responses:
-        '200':
-          description: Relationship rejected successfully
+        '201':
+          description: Resident profile created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RelationshipApiResponse'
+                $ref: '#/components/schemas/SingleResidentResponse'
         '400':
-          description: Validation error or missing reason
+          description: Validation error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '401':
-          description: Unauthorized
+          description: Invalid token
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '403':
-          description: Forbidden - Insufficient permissions
+          description: Permission denied
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '404':
-          description: Relationship not found
+          description: User not found in Identity Access
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '409':
-          description: Relationship already decided
+          description: Resident profile already exists for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '503':
+          description: Identity service unavailable
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
 
-  /internal/v1/relationships/validate:
+  /api/v1/residents/{residentId}:
     get:
       tags:
-        - Internal Verification
-      summary: Validate relationship for internal services
-      description: Validates whether a user has an approved relationship with a unit. Requires service JWT from an allowed caller.
+        - Residents
+      summary: "RES-003: Get resident profile"
+      description: Retrieve a specific resident profile. Allowed for SYSTEM_ADMINISTRATOR, APARTMENT_MANAGER, or the resident user themselves.
       security:
-        - ServiceJwtAuth: []
+        - BearerAuth: []
       parameters:
-        - name: userId
-          in: query
+        - name: residentId
+          in: path
           required: true
+          description: Resident profile UUID
           schema:
             type: string
-          description: User ID to validate
-        - name: unitReference
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Apartment unit reference
-        - name: relationshipType
-          in: query
-          required: true
-          schema:
-            type: string
-            enum: [OWNER, TENANT_RESIDENT]
-          description: Relationship type
+            format: uuid
       responses:
         '200':
-          description: Validation check completed
+          description: Resident retrieved successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RelationshipValidationApiResponse'
-        '400':
-          description: Validation error or missing parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
+                $ref: '#/components/schemas/SingleResidentResponse'
         '401':
-          description: Unauthorized - Service token required
+          description: Invalid token
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '403':
-          description: Forbidden - Caller service not in allow-list
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Resident not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+    patch:
+      tags:
+        - Residents
+      summary: "RES-004: Update resident profile"
+      description: Update resident profile fields. Allowed for SYSTEM_ADMINISTRATOR, APARTMENT_MANAGER, or self-service update.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: residentId
+          in: path
+          required: true
+          description: Resident profile UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateResidentRequest'
+      responses:
+        '200':
+          description: Resident profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleResidentResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Resident not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/owners:
+    get:
+      tags:
+        - Owners
+      summary: "OWN-001: List owner profiles"
+      description: Retrieve paginated owner profiles. Restricted to SYSTEM_ADMINISTRATOR and APARTMENT_MANAGER.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, ARCHIVED]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Owners retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResidentResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+    post:
+      tags:
+        - Owners
+      summary: "OWN-002: Create owner profile"
+      description: Creates a new owner profile. Validates user existence with identity-access-service.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProfileRequest'
+      responses:
+        '201':
+          description: Owner profile created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleResidentResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '409':
+          description: Owner profile already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '503':
+          description: Identity service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/owners/{ownerId}:
+    get:
+      tags:
+        - Owners
+      summary: "OWN-003: Get owner profile"
+      description: Retrieve a specific owner profile. Allowed for SYSTEM_ADMINISTRATOR, APARTMENT_MANAGER, or the owner themselves.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ownerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Owner retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleResidentResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Owner not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/tenants:
+    get:
+      tags:
+        - Tenants
+      summary: "TEN-001: List tenant profiles"
+      description: Retrieve paginated tenant/resident profiles. Restricted to SYSTEM_ADMINISTRATOR and APARTMENT_MANAGER.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, ARCHIVED]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenants retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResidentResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+    post:
+      tags:
+        - Tenants
+      summary: "TEN-002: Create tenant profile"
+      description: Creates a new tenant/resident profile. Validates user existence with identity-access-service.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProfileRequest'
+      responses:
+        '201':
+          description: Tenant profile created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleResidentResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '409':
+          description: Tenant profile already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '503':
+          description: Identity service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/tenants/{tenantId}:
+    get:
+      tags:
+        - Tenants
+      summary: "TEN-003: Get tenant profile"
+      description: Retrieve a specific tenant profile. Allowed for SYSTEM_ADMINISTRATOR, APARTMENT_MANAGER, or the tenant themselves.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenant retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleResidentResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/staff:
+    get:
+      tags:
+        - Staff
+      summary: "STF-001: List staff profiles"
+      description: Retrieve paginated staff profiles. Restricted to SYSTEM_ADMINISTRATOR and APARTMENT_MANAGER.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, ARCHIVED]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Staff retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResidentResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+    post:
+      tags:
+        - Staff
+      summary: "STF-002: Create staff profile"
+      description: Creates a new staff profile. Validates user existence with identity-access-service.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProfileRequest'
+      responses:
+        '201':
+          description: Staff profile created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleResidentResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '409':
+          description: Staff profile already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '503':
+          description: Identity service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/internal/residents/{residentId}/validate:
+    get:
+      tags:
+        - Internal
+      summary: "RES-INT-001: Validate resident profile"
+      description: Validates that a resident profile exists and is active. Accessible only by registered Project A backend services using Service JWT via API Gateway.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: residentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Resident validation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResidentValidationApiResponse'
+        '401':
+          description: Invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Caller service not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Resident not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/internal/users/{userId}/relationships:
+    get:
+      tags:
+        - Internal
+      summary: "RES-INT-002: Get user relationships"
+      description: Retrieves all resident-domain relationships owned by Resident Management for a user. Accessible by registered backend services using Service JWT via API Gateway.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User relationships retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRelationshipsApiResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Caller service not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: User not found
           content:
             application/json:
               schema:
@@ -511,287 +749,213 @@ paths:
 
 components:
   securitySchemes:
-    UserJwtAuth:
+    BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: RSA-signed JWT issued by Gateway for authenticated users (claims type='user', roles=[...]).
-    ServiceJwtAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: RSA-signed JWT for inter-service communication (claims type='service', sub='service-name').
+      description: RS256 JWT token issued/resigned by API Gateway. User JWT for public endpoints, Service JWT for internal endpoints.
 
   schemas:
-    ApiError:
+    ProfileResponse:
       type: object
-      required:
-        - code
-        - message
       properties:
-        code:
+        id:
           type: string
-          example: VALIDATION_ERROR
-        message:
+          format: uuid
+        userId:
           type: string
-          example: safe message
-    ApiErrorResponse:
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, ARCHIVED]
+
+    CreateProfileRequest:
       type: object
       required:
-        - error
+        - userId
+        - firstName
+        - lastName
+        - email
       properties:
-        error:
-          $ref: '#/components/schemas/ApiError'
+        userId:
+          type: string
+          format: uuid
+          description: Identity Access user UUID
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
 
-    PagedMeta:
-      type: object
-      required:
-        - page
-        - size
-        - totalElements
-      properties:
-        page:
-          type: integer
-          example: 0
-        size:
-          type: integer
-          example: 20
-        totalElements:
-          type: integer
-          format: int64
-          example: 42
-
-    ProfileRequest:
+    UpdateResidentRequest:
       type: object
       properties:
         firstName:
           type: string
-          example: John
         lastName:
           type: string
-          example: Doe
+        email:
+          type: string
+          format: email
         phone:
           type: string
-          example: "+1-555-123456"
-        emergencyContact:
-          type: string
-          example: "+1-555-654321"
 
-    ProfileResponse:
+    ResidentValidationResponse:
+      type: object
+      properties:
+        residentId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        exists:
+          type: boolean
+        active:
+          type: boolean
+
+    RelationshipItem:
       type: object
       properties:
         profileId:
           type: string
-          example: prof_12345
+          format: uuid
+        profileType:
+          type: string
+          enum: [RESIDENT, OWNER, TENANT, STAFF]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, ARCHIVED]
+
+    UserRelationshipsData:
+      type: object
+      properties:
         userId:
           type: string
-          example: usr_67890
-        firstName:
-          type: string
-          example: John
-        lastName:
-          type: string
-          example: Doe
-        phone:
-          type: string
-          example: "+1-555-123456"
-        emergencyContact:
-          type: string
-          example: "+1-555-654321"
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    ProfileApiResponse:
-      type: object
-      required:
-        - data
-        - meta
-      properties:
-        data:
-          $ref: '#/components/schemas/ProfileResponse'
-        meta:
-          type: object
-
-    EmailChangeRequest:
-      type: object
-      required:
-        - newEmail
-      properties:
-        newEmail:
-          type: string
-          format: email
-          example: newemail@example.com
-
-    EmailChangeConfirmRequest:
-      type: object
-      required:
-        - verificationToken
-      properties:
-        verificationToken:
-          type: string
-          example: a1b2c3d4e5f6...
-
-    MessageData:
-      type: object
-      required:
-        - message
-      properties:
-        message:
-          type: string
-          example: Verification required
-
-    MessageApiResponse:
-      type: object
-      required:
-        - data
-        - meta
-      properties:
-        data:
-          $ref: '#/components/schemas/MessageData'
-        meta:
-          type: object
-
-    RelationshipRequest:
-      type: object
-      required:
-        - relationshipType
-        - unitReference
-      properties:
-        relationshipType:
-          type: string
-          enum: [OWNER, TENANT_RESIDENT]
-          example: TENANT_RESIDENT
-        unitReference:
-          type: string
-          example: UNIT-101
-        supportingInfo:
-          type: string
-          example: Signed lease agreement attached
-
-    RelationshipRejectRequest:
-      type: object
-      required:
-        - reason
-      properties:
-        reason:
-          type: string
-          maxLength: 500
-          example: Invalid lease agreement
-
-    UnitValidationResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          example: NOT_AVAILABLE
-        reason:
-          type: string
-          example: Group 2 unit/occupancy contract not yet agreed
-
-    RelationshipResponse:
-      type: object
-      properties:
-        relationshipId:
-          type: string
-          example: rel_abcdef
-        requesterUserId:
-          type: string
-          example: usr_123
-        relationshipType:
-          type: string
-          enum: [OWNER, TENANT_RESIDENT]
-          example: TENANT_RESIDENT
-        unitReference:
-          type: string
-          example: UNIT-101
-        supportingInfo:
-          type: string
-          example: Signed lease agreement
-        status:
-          type: string
-          enum: [PENDING, APPROVED, REJECTED]
-          example: PENDING
-        decisionReason:
-          type: string
-          example: Invalid lease agreement
-        decidedBy:
-          type: string
-          example: admin_456
-        decidedAt:
-          type: string
-          format: date-time
-        createdAt:
-          type: string
-          format: date-time
-        unitValidation:
-          $ref: '#/components/schemas/UnitValidationResponse'
-
-    RelationshipApiResponse:
-      type: object
-      required:
-        - data
-        - meta
-      properties:
-        data:
-          $ref: '#/components/schemas/RelationshipResponse'
-        meta:
-          type: object
-
-    RelationshipListApiResponse:
-      type: object
-      required:
-        - data
-        - meta
-      properties:
-        data:
+          format: uuid
+        relationships:
           type: array
           items:
-            $ref: '#/components/schemas/RelationshipResponse'
-        meta:
-          type: object
+            $ref: '#/components/schemas/RelationshipItem'
 
-    PagedRelationshipApiResponse:
+    PagedData:
       type: object
-      required:
-        - data
-        - meta
       properties:
-        data:
+        items:
           type: array
           items:
-            $ref: '#/components/schemas/RelationshipResponse'
-        meta:
-          $ref: '#/components/schemas/PagedMeta'
+            $ref: '#/components/schemas/ProfileResponse'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
 
-    RelationshipValidationResponse:
+    SingleResidentResponse:
       type: object
-      required:
-        - verified
-        - relationshipType
-        - status
       properties:
-        verified:
+        success:
           type: boolean
           example: true
-        relationshipType:
+        message:
           type: string
-          example: TENANT_RESIDENT
-        status:
-          type: string
-          enum: [APPROVED, PENDING, REJECTED, NONE]
-          example: APPROVED
-
-    RelationshipValidationApiResponse:
-      type: object
-      required:
-        - data
-        - meta
-      properties:
         data:
-          $ref: '#/components/schemas/RelationshipValidationResponse'
-        meta:
-          type: object
+          $ref: '#/components/schemas/ProfileResponse'
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+
+    PagedResidentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/PagedData'
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+
+    ResidentValidationApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ResidentValidationResponse'
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+
+    UserRelationshipsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/UserRelationshipsData'
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+
+    ErrorDetail:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          nullable: true
+
+    ApiErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
