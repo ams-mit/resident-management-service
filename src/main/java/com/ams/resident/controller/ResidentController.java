@@ -61,6 +61,9 @@ public class ResidentController {
         }
 
         Page<ResidentResponse> pagedResidents = residentService.getAllResidents(PageRequest.of(page, size));
+        if (pagedResidents == null) {
+            pagedResidents = Page.empty(PageRequest.of(page, size));
+        }
 
         PagedMeta meta = PagedMeta.builder()
                 .page(pagedResidents.getNumber())
