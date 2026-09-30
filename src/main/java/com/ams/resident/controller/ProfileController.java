@@ -14,9 +14,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
-@RequestMapping("/api/v1/profiles/me")
+@RequestMapping("/api/v1/profiles")
 @RequiredArgsConstructor
-@Tag(name = "Profile Management", description = "Endpoints for residents to manage their own profiles")
+@Tag(name = "Profile Management", description = "Endpoints for managing user profiles")
 @SecurityRequirement(name = "BearerAuth")
 public class ProfileController {
 
@@ -26,7 +26,7 @@ public class ProfileController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile retrieved successfully")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Profile not found for the user")
-    @GetMapping
+    @GetMapping("/me")
     public ResponseEntity<ApiResponse<ProfileResponse>> getOwnProfile() {
         return ResponseEntity.ok(ApiResponse.of(profileService.getOwnProfile()));
     }
@@ -36,16 +36,16 @@ public class ProfileController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request payload")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Profile not found")
-    @PutMapping
+    @PutMapping("/me")
     public ResponseEntity<ApiResponse<ProfileResponse>> editOwnProfile(@Valid @RequestBody ProfileRequest request) {
         return ResponseEntity.ok(ApiResponse.of(profileService.editOwnProfile(request)));
     }
 
-    @Operation(summary = "Request email change", description = "Initiates a request to change the user's primary email. Triggers Identity event (Simulated). Requires user token.")
+    @Operation(summary = "Request email change", description = "Initiates a request to change the user's primary email. Requires user token.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "202", description = "Email change request accepted")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid email format")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
-    @PostMapping("/email-change")
+    @PostMapping("/me/email-change")
     public ResponseEntity<ApiResponse<java.util.Map<String, String>>> requestEmailChange(@Valid @RequestBody EmailChangeRequest request) {
         profileService.requestEmailChange(request);
         return ResponseEntity.status(org.springframework.http.HttpStatus.ACCEPTED)
@@ -58,10 +58,21 @@ public class ProfileController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Email already in use")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Identity service unavailable")
-    @PutMapping("/email-change/confirm")
+    @PutMapping("/me/email-change/confirm")
     public ResponseEntity<ApiResponse<java.util.Map<String, String>>> confirmEmailChange(
             @Valid @RequestBody com.ams.resident.dto.EmailChangeConfirmRequest request) {
         profileService.confirmEmailChange(request);
         return ResponseEntity.ok(ApiResponse.of(java.util.Map.of("message", "Email updated")));
+    }
+
+    @Operation(summary = "Get user profile by ID", description = "Retrieves the profile of a specific user. Restricted to SYSTEM_ADMINISTRATOR.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile retrieved successfully")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Profile not found")
+    @GetMapping("/{userId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('SYSTEM_ADMINISTRATOR')")
+    public ResponseEntity<ApiResponse<ProfileResponse>> getProfileByUserId(@PathVariable String userId) {
+        return ResponseEntity.ok(ApiResponse.of(profileService.getProfileByUserId(userId)));
     }
 }

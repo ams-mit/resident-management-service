@@ -43,6 +43,12 @@ public class ProfileService {
         return mapToResponse(profile);
     }
 
+    public ProfileResponse getProfileByUserId(String userId) {
+        Profile profile = profileRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("PROFILE_NOT_FOUND", "Profile not found for user: " + userId));
+        return mapToResponse(profile);
+    }
+
     @Transactional
     public ProfileResponse editOwnProfile(ProfileRequest request) {
         String userId = getAuthenticatedUserId();
