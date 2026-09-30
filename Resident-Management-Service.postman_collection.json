@@ -52,6 +52,20 @@
 					}
 				},
 				{
+					"name": "RES-001 List Residents (Unauthorized - 401 INVALID_TOKEN)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "X-Request-ID", "value": "{{$guid}}", "type": "text"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/residents",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "residents"]
+						}
+					}
+				},
+				{
 					"name": "RES-002 Create Resident (Success)",
 					"request": {
 						"auth": {
@@ -75,7 +89,7 @@
 					}
 				},
 				{
-					"name": "RES-002 Create Resident (Validation Error)",
+					"name": "RES-002 Create Resident (Validation Error - 400)",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -89,6 +103,52 @@
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"userId\": \"not-a-uuid\",\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"email\": \"invalid-email\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/residents",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "residents"]
+						}
+					}
+				},
+				{
+					"name": "RES-002 Create Resident (Conflict - 409 RESIDENT_ALREADY_EXISTS)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{"key": "token", "value": "{{admin_jwt_token}}", "type": "string"}]
+						},
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json", "type": "text"},
+							{"key": "X-Request-ID", "value": "{{$guid}}", "type": "text"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Perera\",\n  \"email\": \"john.perera@example.com\",\n  \"phone\": \"0771234567\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/residents",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "residents"]
+						}
+					}
+				},
+				{
+					"name": "RES-002 Create Resident (Dependency Unavailable - 503)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{"key": "token", "value": "{{admin_jwt_token}}", "type": "string"}]
+						},
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json", "type": "text"},
+							{"key": "X-Request-ID", "value": "{{$guid}}", "type": "text"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Perera\",\n  \"email\": \"john.perera@example.com\",\n  \"phone\": \"0771234567\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/residents",
@@ -371,6 +431,24 @@
 						"auth": {
 							"type": "bearer",
 							"bearer": [{"key": "token", "value": "{{unauthorized_service_jwt_token}}", "type": "string"}]
+						},
+						"method": "GET",
+						"header": [
+							{"key": "X-Request-ID", "value": "{{$guid}}", "type": "text"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/internal/residents/{{resident_id}}/validate",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "internal", "residents", "{{resident_id}}", "validate"]
+						}
+					}
+				},
+				{
+					"name": "RES-INT-001 Validate Resident (Dependency Unavailable - 503)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{"key": "token", "value": "{{service_jwt_token}}", "type": "string"}]
 						},
 						"method": "GET",
 						"header": [

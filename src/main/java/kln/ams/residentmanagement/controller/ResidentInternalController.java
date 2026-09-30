@@ -36,6 +36,8 @@ public class ResidentInternalController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller service not allowed",
                 content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Resident not found",
+                content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Dependency unavailable",
                 content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     @GetMapping("/residents/{residentId}/validate")

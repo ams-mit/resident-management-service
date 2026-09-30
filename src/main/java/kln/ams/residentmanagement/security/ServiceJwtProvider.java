@@ -1,5 +1,6 @@
 package kln.ams.residentmanagement.security;
 
+import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSSigner;
@@ -61,7 +62,9 @@ public class ServiceJwtProvider {
                     .build();
 
             SignedJWT signedJWT = new SignedJWT(
-                    new JWSHeader.Builder(JWSAlgorithm.RS256).build(),
+                    new JWSHeader.Builder(JWSAlgorithm.RS256)
+                            .type(JOSEObjectType.JWT)
+                            .build(),
                     claimsSet
             );
 

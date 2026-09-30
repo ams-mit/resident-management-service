@@ -13,6 +13,7 @@ CREATE TABLE profiles (
 );
 
 CREATE INDEX idx_profiles_user_id ON profiles(user_id);
+CREATE INDEX idx_profiles_email ON profiles(email);
 CREATE INDEX idx_profiles_status ON profiles(status);
 CREATE INDEX idx_profiles_type ON profiles(profile_type);
 
