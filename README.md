@@ -1,181 +1,189 @@
-# Resident Management Service 🏢
+# Project A — Resident Management Service 🏢
 
-![Java 17](https://img.shields.io/badge/Java-17-blue)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2-brightgreen)
+![Java 21](https://img.shields.io/badge/Java-21-blue)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2.5-brightgreen)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-blue)
 ![Architecture](https://img.shields.io/badge/Architecture-Microservice-orange)
 
-The **Resident Management Service** is a core microservice for the University of Kelaniya Apartment Management System (AMS). It acts as the authoritative boundary for Resident Profiles and Apartment Relationships.
+The **Resident Management Service** (`resident-management-service`) is an authoritative core domain microservice for the University of Kelaniya Apartment Management System (AMS Project A, Group 1 — Apartment Identity and Resident Management). It manages personal profiles, contact records, and metadata for Residents, Owners, Tenants, and Staff members, as well as providing internal validation and relationship query APIs for other Project A microservices.
 
-This service operates as a stateless **OAuth2 Resource Server** running on port **8081** sitting behind the project's API Gateway.
+This service operates as a stateless **OAuth2 Resource Server** running on port **8081** behind the shared API Gateway.
 
 ---
 
 ## 🏗️ Architecture & Boundaries
 
-- **Stateless Authentication:** The service independently verifies Gateway-issued RS256 JSON Web Tokens using the API Gateway's public key (`GATEWAY_JWT_PUBLIC_KEY`). It does not store passwords or manage user sessions.
-  - `/api/v1/**` endpoints require `type=user` JWTs.
-  - `/internal/v1/**` endpoints require `type=service` JWTs from authorized services.
-- **Microservice Independence:** The service owns its own MySQL database (`resident_management_db`) and schema (managed exclusively via Flyway). Cross-service database access is strictly prohibited.
-- **External Integrations:**
-  - **Identity Access Service:** Outbound call `PUT /internal/v1/users/{userId}/email` with a signed Service JWT to finalize verified email changes.
+* **Authoritative Domain Scope:**
+  * Manages personal profile records (`first_name`, `last_name`, `email`, `phone`, `profile_type`, `status`) for Residents, Owners, Tenants, and Staff.
+  * Provides internal verification and relationship lookup endpoints for cross-service authorization and validation (`RES-INT-001`, `RES-INT-002`).
+  * **Strict Boundary Exclusions:**
+    * Property, building, floor, unit, and unit ownership records are strictly owned by `property-unit-service`.
+    * Unit occupancy, lease agreements, and tenant assignments are strictly owned by `lease-occupancy-service`.
+    * User accounts, authentication credentials, passwords, role assignments, permissions, and email change verification flows are strictly owned by `identity-access-service`.
+    * Invoices, charges, payments, and receipts are strictly owned by `billing-payment-service` and `utility-charge-service`.
+    * Maintenance requests, work orders, facilities, and bookings are strictly owned by `operations-service`.
+    * Visitors, announcements, and notifications are strictly owned by `community-service`.
+* **Stateless Authentication & Security:**
+  * Validates API Gateway-issued RS256 JSON Web Tokens using the public key (`GATEWAY_JWT_PUBLIC_KEY`).
+  * User endpoints (`/api/v1/**`) require signed Gateway User JWTs (`type=user`, `sub=userId`, `roles`).
+  * Internal endpoints (`/api/v1/internal/**`) require signed Gateway Service JWTs (`type=service`, `sub=calling-service`) with caller allowlist authorization.
+  * Public endpoints: `/actuator/health/**`, `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`.
+* **Outbound Cross-Service Integration:**
+  * Calls `identity-access-service` via `GET /api/v1/internal/users/{userId}/validate` (`IAM-INT-001`) with a signed Service JWT (`alg=RS256`, `typ=JWT`, `type=service`, `sub=resident-management-service`) to verify user existence and active status before profile creation.
+  * Bounded timeouts: Connection timeout = 2 seconds, Read timeout = 5 seconds.
+  * Downstream unavailability cleanly returns `503 Service Unavailable` with error code `DEPENDENCY_UNAVAILABLE`.
+* **Database & Schema:**
+  * Dedicated MySQL database (`resident_management_db`) managed exclusively via Flyway migration (`V1__init_schema.sql`).
+  * Unique constraint on `(user_id, profile_type)` ensuring no duplicate profile types per user.
+  * Indexes on `user_id`, `email` (`idx_profiles_email`), `profile_type`, and `status`.
+  * Dedicated `audit_events` table for structured auditing of profile events.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Tech Stack & Standards
 
-* **Core:** Java 17, Spring Boot 3.2.x, Spring MVC
-* **Security:** Spring Security (OAuth2 Resource Server, Nimbus JWT)
-* **Database:** MySQL 8.0, Spring Data JPA, Hibernate
-* **Migrations:** Flyway
-* **Testing:** JUnit 5, Mockito, Testcontainers (MySQL module)
-* **Documentation:** Springdoc OpenAPI (Swagger UI), Static OpenAPI 3.0 specification (`docs/openapi.yaml`)
+* **Base Package:** `kln.ams.residentmanagement`
+* **Maven GroupId:** `kln.ams`
+* **Java Version:** 21 (Eclipse Temurin 21)
+* **Framework:** Spring Boot 3.2.5 (Spring MVC, Spring Data JPA, Spring Security OAuth2 Resource Server, Spring Boot Actuator)
+* **Security:** Nimbus JOSE JWT (RS256 signature verification and generation), `X-Request-ID` correlation tracing filter
+* **Database:** MySQL 8.0, Hibernate, Flyway Migrations
+* **Testing:** JUnit 5, Mockito, Spring Boot Test, H2 In-Memory Database (MySQL Mode)
+* **API Documentation:** OpenAPI 3.0.3 (`docs/openapi.yaml`), Postman Collection (`Resident-Management-Service.postman_collection.json`)
 
 ---
 
-## 🚀 Endpoints
+## 🚀 Canonical API Endpoints (14 Operations)
 
-All endpoints produce unified envelopes: `{ "data": ..., "meta": ... }` or `{ "error": { "code", "message" } }`.
+All provider endpoints conform strictly to the canonical contract defined in `RESIDENT-MANAGEMENT-SERVICE.md`:
 
-| Method | Path | Authentication | Allowed Roles / Callers | Response Description |
+### 1. Resident Profile Endpoints
+| API ID | Method | Path | Allowed Roles / Caller | Description |
 |---|---|---|---|---|
-| `GET` | `/api/v1/profiles/me` | User JWT (`type=user`) | Authenticated (Any role) | Current user profile |
-| `PUT` | `/api/v1/profiles/me` | User JWT (`type=user`) | Authenticated (Any role) | Updated user profile |
-| `POST` | `/api/v1/profiles/me/email-change` | User JWT (`type=user`) | Authenticated (Any role) | Accepted (`202 Accepted`) |
-| `PUT` | `/api/v1/profiles/me/email-change/confirm` | User JWT (`type=user`) | Authenticated (Any role) | Confirmation (`200 OK`) |
-| `GET` | `/api/v1/profiles/{userId}` | User JWT (`type=user`) | `SYSTEM_ADMINISTRATOR` | User profile by user ID |
-| `POST` | `/api/v1/relationships` | User JWT (`type=user`) | Authenticated (Any role) | Created relationship request (`201 Created`) |
-| `GET` | `/api/v1/relationships/me` | User JWT (`type=user`) | Authenticated (Any role) | List of own relationships |
-| `GET` | `/api/v1/relationships` | User JWT (`type=user`) | `SYSTEM_ADMINISTRATOR` | Paged list of relationships (optional `status`) |
-| `GET` | `/api/v1/relationships/{id}` | User JWT (`type=user`) | `SYSTEM_ADMINISTRATOR` | Relationship detail + unitValidation placeholder |
-| `PATCH` | `/api/v1/relationships/{id}/approve` | User JWT (`type=user`) | `SYSTEM_ADMINISTRATOR` | Approved relationship |
-| `PATCH` | `/api/v1/relationships/{id}/reject` | User JWT (`type=user`) | `SYSTEM_ADMINISTRATOR` | Rejected relationship with reason |
-| `GET` | `/internal/v1/relationships/validate` | Service JWT (`type=service`) | Service allow-list | Relationship verification status |
+| `RES-001` | `GET` | `/api/v1/residents` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER` | List resident profiles (paged, filterable by status, search, userId) |
+| `RES-002` | `POST` | `/api/v1/residents` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER` | Create resident profile (validates user via Identity Access) |
+| `RES-003` | `GET` | `/api/v1/residents/{residentId}` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER`, or Self | Get resident profile by resident ID |
+| `RES-004` | `PATCH` | `/api/v1/residents/{residentId}` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER`, or Self | Update resident profile fields |
+
+### 2. Owner Profile Endpoints
+| API ID | Method | Path | Allowed Roles / Caller | Description |
+|---|---|---|---|---|
+| `OWN-001` | `GET` | `/api/v1/owners` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER` | List owner profiles (paged, filterable) |
+| `OWN-002` | `POST` | `/api/v1/owners` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER` | Create owner profile (validates user via Identity Access) |
+| `OWN-003` | `GET` | `/api/v1/owners/{ownerId}` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER`, or Self | Get owner profile by owner ID |
+
+### 3. Tenant Profile Endpoints
+| API ID | Method | Path | Allowed Roles / Caller | Description |
+|---|---|---|---|---|
+| `TEN-001` | `GET` | `/api/v1/tenants` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER` | List tenant/resident profiles (paged, filterable) |
+| `TEN-002` | `POST` | `/api/v1/tenants` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER` | Create tenant profile (validates user via Identity Access) |
+| `TEN-003` | `GET` | `/api/v1/tenants/{tenantId}` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER`, or Self | Get tenant profile by tenant ID |
+
+### 4. Staff Profile Endpoints
+| API ID | Method | Path | Allowed Roles / Caller | Description |
+|---|---|---|---|---|
+| `STF-001` | `GET` | `/api/v1/staff` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER` | List staff profiles (paged, filterable) |
+| `STF-002` | `POST` | `/api/v1/staff` | `SYSTEM_ADMINISTRATOR`, `APARTMENT_MANAGER` | Create staff profile (validates user via Identity Access) |
+
+### 5. Internal Service-to-Service Endpoints
+| API ID | Method | Path | Authentication | Allowed Caller Services |
+|---|---|---|---|---|
+| `RES-INT-001` | `GET` | `/api/v1/internal/residents/{residentId}/validate` | Gateway Service JWT (`type=service`) | `property-unit-service`, `lease-occupancy-service`, `billing-payment-service`, `utility-charge-service`, `operations-service`, `community-service` |
+| `RES-INT-002` | `GET` | `/api/v1/internal/users/{userId}/relationships` | Gateway Service JWT (`type=service`) | Registered Project A backend services |
 
 ---
 
-## 📦 Response & Error Envelopes
+## 📦 Global Response & Error Envelopes
 
-### 1. Success Response (Single / Unpaged)
+### 1. Standard Success Response
+HTTP 200/201 returns:
 ```json
 {
-  "data": {
-    "profileId": "prof_12345",
-    "userId": "usr_67890",
-    "firstName": "John",
-    "lastName": "Doe",
-    "phone": "+1-555-123456",
-    "emergencyContact": "+1-555-654321"
-  },
-  "meta": {}
+  "success": true,
+  "message": "Operation completed successfully",
+  "data": { ... },
+  "timestamp": "2026-09-30T12:00:00Z",
+  "requestId": "7f83a9b2-3c4d-4e5f-a6b7-8c9d0e1f2a3b"
 }
 ```
 
-### 2. Paged List Response
-Query parameters: `page` (default `0`), `size` (default `20`, max `100`). Invalid values return HTTP 400 with code `VALIDATION_ERROR`.
+### 2. Standard Paged List Response
 ```json
 {
-  "data": [
-    {
-      "relationshipId": "rel_abcdef",
-      "requesterUserId": "usr_123",
-      "relationshipType": "TENANT_RESIDENT",
-      "unitReference": "UNIT-101",
-      "status": "APPROVED",
-      "createdAt": "2026-09-30T10:00:00"
-    }
-  ],
-  "meta": {
+  "success": true,
+  "message": "Residents retrieved successfully",
+  "data": {
+    "items": [ ... ],
     "page": 0,
     "size": 20,
-    "totalElements": 42
-  }
+    "totalElements": 1,
+    "totalPages": 1
+  },
+  "timestamp": "2026-09-30T12:00:00Z",
+  "requestId": "7f83a9b2-3c4d-4e5f-a6b7-8c9d0e1f2a3b"
 }
 ```
 
-### 3. Error Response
-All errors (including Spring Security 401 and 403) return a standardized error envelope:
+### 3. Standard Error Response
+HTTP 4xx/5xx returns:
 ```json
 {
+  "success": false,
+  "message": "Resident profile not found for id: uuid",
   "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Reason is required"
-  }
+    "code": "RESIDENT_NOT_FOUND",
+    "details": null
+  },
+  "timestamp": "2026-09-30T12:00:00Z",
+  "requestId": "7f83a9b2-3c4d-4e5f-a6b7-8c9d0e1f2a3b"
 }
 ```
-Standard codes include `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `PROFILE_NOT_FOUND`, `RELATIONSHIP_NOT_FOUND`, `RELATIONSHIP_ALREADY_DECIDED`, `EMAIL_ALREADY_IN_USE`, `INVALID_VERIFICATION_TOKEN`, and `DEPENDENCY_UNAVAILABLE`.
 
----
+Validation errors (`VALIDATION_ERROR`) include field-level details:
+```json
+{
+  "success": false,
+  "message": "Request validation failed",
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "details": {
+      "firstName": "firstName is required",
+      "email": "email must be a valid email address"
+    }
+  },
+  "timestamp": "2026-09-30T12:00:00Z",
+  "requestId": "7f83a9b2-3c4d-4e5f-a6b7-8c9d0e1f2a3b"
+}
+```
 
-## ✉️ Email Change Flow (US-G1-18)
-
-1. **Initiate Request:**
-   - User submits `POST /api/v1/profiles/me/email-change` with `{ "newEmail": "new@example.com" }`.
-   - The service creates a cryptographically secure random token and stores only its SHA-256 hash in `email_change_requests` with a 24-hour expiration.
-   - Any prior pending requests for the user are invalidated.
-   - Real email dispatch is handled outside this service (Case Scope §13). The raw token is logged **ONCE** at INFO level with prefix `[DEV-ONLY]` for local testing and demonstration purposes (e.g., `[DEV-ONLY] Email change verification token for user ...`). The raw token is **never** returned in any response.
-   - Returns `202 Accepted` with `{ "data": { "message": "Verification required" }, "meta": {} }`.
-   - Records audit event `EMAIL_CHANGE_REQUESTED`.
-2. **Confirm Request:**
-   - User submits `PUT /api/v1/profiles/me/email-change/confirm` with `{ "verificationToken": "..." }`.
-   - The token hash is checked against the user's active, unexpired request for their authenticated user ID.
-   - The service makes an outbound call to `identity-access-service` via `PUT /internal/v1/users/{userId}/email` with `{ "newEmail": "..." }` and a signed Service JWT.
-   - On `200 OK` from identity, marks the request as used, logs audit action `EMAIL_CHANGED`, and returns `200 OK` with `{ "data": { "message": "Email updated" }, "meta": {} }`.
-   - On `409 Conflict`, returns `409` (`EMAIL_ALREADY_IN_USE`) while leaving the token request active.
-   - On identity unavailability, timeout, or 5xx, returns `503` (`DEPENDENCY_UNAVAILABLE`) while leaving the token request active for retry.
-
----
-
-## 🔒 Internal Verification & Caller Allow-List (US-G1-26)
-
-`GET /internal/v1/relationships/validate?userId=&unitReference=&relationshipType=` allows trusted services to verify tenant/owner status without retrieving personal profile data.
-
-- **Authentication:** Must present a valid Gateway Service JWT (`type=service`).
-- **Authorization Allow-List:** Caller `sub` must be in the configured allow-list:
-  ```yaml
-  internal-api:
-    allowed-callers:
-      relationship-validation:
-        - property-unit-service
-        - lease-occupancy-service
-        - billing-payment-service
-        - utility-charge-service
-        - operations-service
-        - community-service
-  ```
-- Calls with unauthorized service `sub` return `403 FORBIDDEN`.
-- Response structure:
-  ```json
-  {
-    "data": {
-      "verified": true,
-      "relationshipType": "TENANT_RESIDENT",
-      "status": "APPROVED"
-    },
-    "meta": {}
-  }
-  ```
-  `verified` is `true` **only** when an approved matching relationship exists. If no match is found, returns HTTP 200 with `verified: false` and `status: "NONE"`.
+### 4. Canonical Error Codes
+* `VALIDATION_ERROR`: Malformed JSON or DTO validation failure (HTTP 400)
+* `INVALID_TOKEN`: Missing, invalid, expired, or wrong type User JWT (HTTP 401)
+* `INVALID_SERVICE_TOKEN`: Missing, invalid, or wrong type Service JWT (HTTP 401)
+* `PERMISSION_DENIED`: Insufficient user role or unauthorized cross-user profile access (HTTP 403)
+* `CALLER_SERVICE_NOT_ALLOWED`: Service caller not in endpoint allowlist (HTTP 403)
+* `USER_NOT_FOUND`: Referenced user does not exist in Identity Access (HTTP 404)
+* `RESIDENT_NOT_FOUND`: Resident profile not found (HTTP 404)
+* `OWNER_NOT_FOUND`: Owner profile not found (HTTP 404)
+* `TENANT_NOT_FOUND`: Tenant profile not found (HTTP 404)
+* `STAFF_NOT_FOUND`: Staff profile not found (HTTP 404)
+* `RESIDENT_ALREADY_EXISTS`: Resident profile already exists for user (HTTP 409)
+* `OWNER_ALREADY_EXISTS`: Owner profile already exists for user (HTTP 409)
+* `TENANT_ALREADY_EXISTS`: Tenant profile already exists for user (HTTP 409)
+* `STAFF_ALREADY_EXISTS`: Staff profile already exists for user (HTTP 409)
+* `DEPENDENCY_UNAVAILABLE`: Downstream service communication failure or timeout (HTTP 503)
+* `INTERNAL_SERVER_ERROR`: Unhandled internal server exception (HTTP 500)
 
 ---
 
 ## 🗄️ Database Migrations
 
-Database migrations are managed via **Flyway**:
-- `V1__init_schema.sql`: Initial schema for profiles and apartment relationships.
-- `V2__add_timestamps_and_audit_events.sql`: Adds `created_at` / `updated_at` columns and `audit_events` table.
-- `V3__create_email_change_requests.sql`: Creates `email_change_requests` table.
-- `V4__add_relationship_decision_columns.sql`: Adds `decided_by`, `decided_at`, and widens `decision_reason` on `apartment_relationships`.
-
----
-
-## 📋 Known Open Items
-
-The following architectural and cross-service items remain open:
-- **Notifications ownership:** Architectural ownership of resident notification dispatch upon relationship approvals/rejections.
-- **Group 2 unit contract:** Final contract alignment with Group 2 (Property Management) regarding unit reference validation, error response format, and schema semantics.
-- **Gateway routes/keys:** Alignment on gateway routing configurations, path prefixes, and shared JWT verification keys in production environments.
-- **Spring Boot/Java version alignment:** Harmonization of Java and Spring Boot baseline versions across all group services.
+Managed strictly via **Flyway**:
+* `src/main/resources/db/migration/V1__init_schema.sql`:
+  * `profiles` table: `id`, `user_id`, `first_name`, `last_name`, `email`, `phone`, `profile_type`, `status`, `created_at`, `updated_at`.
+  * Unique constraint on `(user_id, profile_type)` (`uq_user_profile_type`).
+  * Indexes on `user_id`, `email` (`idx_profiles_email`), `profile_type`, and `status`.
+  * `audit_events` table for structured auditing.
 
 ---
 
@@ -194,23 +202,39 @@ cp .env.example .env
 | `DB_USERNAME` | MySQL database username | `root` |
 | `DB_PASSWORD` | MySQL database password | `your_mysql_password` |
 | `GATEWAY_BASE_URL` | API Gateway base URL | `http://localhost:8000` |
-| `GATEWAY_JWT_PUBLIC_KEY` | Base64-encoded RSA public key for verifying user JWTs | *(Required)* |
-| `SERVICE_NAME` | Service identifier for outbound requests | `resident-management-service` |
-| `SERVICE_JWT_PRIVATE_KEY` | Base64 or PEM RSA private key for outbound service JWTs | *(Optional in dev)* |
+| `GATEWAY_JWT_PUBLIC_KEY` | RS256 RSA public key for inbound JWT verification | *(Configured per env)* |
+| `SERVICE_NAME` | Calling service identity | `resident-management-service` |
+| `SERVICE_JWT_PRIVATE_KEY` | RS256 RSA private key for outbound service calls | *(Configured per env)* |
+| `SERVICE_JWT_EXPIRES_IN` | Outbound Service JWT lifetime | `5m` |
+| `CLIENT_CONNECT_TIMEOUT_MS`| RestTemplate connect timeout | `2000` |
+| `CLIENT_READ_TIMEOUT_MS`   | RestTemplate read timeout | `5000` |
 
-### 2. Running Locally
+### 2. Building and Running Locally
+Prerequisites: Java 21 (Temurin 21 recommended), Maven 3.9+
 ```bash
+# Clean build and run automated tests
+./mvnw clean test
+
+# Run the application
 ./mvnw clean spring-boot:run
 ```
 On Windows:
 ```cmd
+.\mvnw.cmd clean test
 .\mvnw.cmd clean spring-boot:run
 ```
 
-### 3. Health Probes
-Spring Boot Actuator health probes (permitted without authentication):
-- Liveness: `GET /actuator/health/liveness` (`{"status":"UP"}`)
-- Readiness: `GET /actuator/health/readiness` (`{"status":"UP"}`)
+### 3. Running with Docker
+```bash
+# Build Docker image (Java 21 multi-stage, non-root user)
+docker build -t resident-management-service:latest .
 
----
-*Developed for the University of Kelaniya - Software Architecture and Process Models.*
+# Run with docker-compose
+docker-compose up -d
+```
+
+### 4. Health Probes
+Spring Boot Actuator health endpoints:
+* Health check: `GET /actuator/health` (`{"status":"UP"}`)
+* Swagger UI: `http://localhost:8081/swagger-ui.html`
+* OpenAPI JSON: `http://localhost:8081/v3/api-docs`
