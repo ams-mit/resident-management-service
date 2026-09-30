@@ -3,12 +3,19 @@ package com.ams.resident.service;
 import com.ams.resident.client.PropertyClient;
 import com.ams.resident.dto.RelationshipRequest;
 import com.ams.resident.dto.RelationshipResponse;
+import com.ams.resident.dto.UnitValidationResponse;
 import com.ams.resident.entity.ApartmentRelationship;
 import com.ams.resident.entity.RelationshipStatus;
+import com.ams.resident.exception.BadRequestException;
+import com.ams.resident.exception.ResourceNotFoundException;
 import com.ams.resident.repository.ApartmentRelationshipRepository;
+import com.ams.resident.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,27 +42,65 @@ public class RelationshipService {
         relationship = relationshipRepository.save(relationship);
         auditService.logEvent("FR-AUD-004", "RELATIONSHIP", relationship.getId(), userId, "Submitted relationship request for unit " + request.getUnitReference());
 
-        return mapToResponse(relationship);
+        return mapToResponse(relationship, false);
     }
 
     public List<RelationshipResponse> getOwnRelationships() {
         String userId = getAuthenticatedUserId();
         return relationshipRepository.findByUserId(userId).stream()
-                .map(this::mapToResponse)
+                .map(rel -> mapToResponse(rel, false))
                 .collect(Collectors.toList());
     }
 
-    private String getAuthenticatedUserId() {
-        return com.ams.resident.security.SecurityUtils.getCurrentUserId();
+    public Page<RelationshipResponse> getRelationships(String status, Pageable pageable) {
+        Page<ApartmentRelationship> page;
+        if (StringUtils.hasText(status)) {
+            RelationshipStatus relStatus;
+            try {
+                relStatus = RelationshipStatus.valueOf(status.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("VALIDATION_ERROR", "Invalid status: " + status + ". Allowed values: PENDING, APPROVED, REJECTED");
+            }
+            page = relationshipRepository.findByStatus(relStatus, pageable);
+        } else {
+            page = relationshipRepository.findAll(pageable);
+        }
+
+        return page.map(rel -> mapToResponse(rel, false));
     }
-    
-    private RelationshipResponse mapToResponse(ApartmentRelationship relationship) {
+
+    public RelationshipResponse getRelationshipById(String id) {
+        ApartmentRelationship relationship = relationshipRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("RELATIONSHIP_NOT_FOUND", "Relationship not found with id: " + id));
+
+        RelationshipResponse response = mapToResponse(relationship, true);
+        // TODO: Group 2 unit/occupancy contract not yet agreed. Do NOT call PropertyClient here.
+        response.setUnitValidation(new UnitValidationResponse("NOT_AVAILABLE", "Group 2 unit/occupancy contract not yet agreed"));
+        return response;
+    }
+
+    private String getAuthenticatedUserId() {
+        return SecurityUtils.getCurrentUserId();
+    }
+
+    private RelationshipResponse mapToResponse(ApartmentRelationship relationship, boolean includeAllDecisions) {
         RelationshipResponse response = new RelationshipResponse();
         response.setRelationshipId(relationship.getId());
+        response.setRequesterUserId(relationship.getUserId());
         response.setRelationshipType(relationship.getRelationshipType());
         response.setUnitReference(relationship.getUnitReference());
+        response.setSupportingInfo(relationship.getSupportingInfo());
         response.setStatus(relationship.getStatus());
-        response.setDecisionReason(relationship.getDecisionReason());
+        response.setCreatedAt(relationship.getCreatedAt());
+
+        if (includeAllDecisions || relationship.getStatus() == RelationshipStatus.REJECTED) {
+            response.setDecisionReason(relationship.getDecisionReason());
+        }
+        if (includeAllDecisions) {
+            response.setDecidedBy(relationship.getDecidedBy());
+            response.setDecidedAt(relationship.getDecidedAt());
+        }
+
         return response;
     }
 }
