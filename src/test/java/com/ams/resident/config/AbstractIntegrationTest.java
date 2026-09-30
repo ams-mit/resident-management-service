@@ -5,19 +5,20 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
 
-    @Container
-    static MySQLContainer<?> mySQLContainer = new MySQLContainer<>("mysql:8.0.33")
-            .withDatabaseName("resident_management_db_test")
-            .withUsername("testuser")
-            .withPassword("testpass");
+    static final MySQLContainer<?> mySQLContainer;
+
+    static {
+        mySQLContainer = new MySQLContainer<>("mysql:8.0.33")
+                .withDatabaseName("resident_management_db_test")
+                .withUsername("testuser")
+                .withPassword("testpass");
+        mySQLContainer.start();
+    }
 
     @DynamicPropertySource
     static void dynamicProperties(DynamicPropertyRegistry registry) {

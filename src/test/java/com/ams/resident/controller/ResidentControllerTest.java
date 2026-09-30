@@ -56,7 +56,7 @@ public class ResidentControllerTest {
         resident.setUserId("user-2");
 
         when(residentService.getAllResidents(eq(PageRequest.of(2, 10))))
-                .thenReturn(new PageImpl<>(List.of(resident), PageRequest.of(2, 10), 25));
+                .thenReturn(new PageImpl<>(List.of(resident, resident, resident, resident, resident), PageRequest.of(2, 10), 25));
 
         mockMvc.perform(get("/api/v1/residents")
                         .param("page", "2")
