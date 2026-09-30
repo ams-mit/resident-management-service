@@ -51,3 +51,13 @@ service:
 client:
   connect-timeout-ms: ${CLIENT_CONNECT_TIMEOUT_MS:3000}
   read-timeout-ms: ${CLIENT_READ_TIMEOUT_MS:5000}
+
+internal-api:
+  allowed-callers:
+    relationship-validation:
+      - property-unit-service
+      - lease-occupancy-service
+      - billing-payment-service
+      - utility-charge-service
+      - operations-service
+      - community-service

@@ -49,6 +49,9 @@ public class SecurityConfig {
     @Value("${gateway.jwt.public-key}")
     private String publicKeyStr;
 
+    @Value("${internal-api.allowed-callers.relationship-validation:property-unit-service,lease-occupancy-service,billing-payment-service,utility-charge-service,operations-service,community-service}")
+    private List<String> allowedRelationshipCallers;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -94,7 +97,7 @@ public class SecurityConfig {
                     .jwtAuthenticationConverter(jwtAuthenticationConverter())
                 )
             )
-            .addFilterAfter(new TokenTypeFilter(), BearerTokenAuthenticationFilter.class);
+            .addFilterAfter(new TokenTypeFilter(allowedRelationshipCallers), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
@@ -133,6 +136,12 @@ public class SecurityConfig {
 
     public static class TokenTypeFilter extends OncePerRequestFilter {
 
+        private final List<String> allowedRelationshipCallers;
+
+        public TokenTypeFilter(List<String> allowedRelationshipCallers) {
+            this.allowedRelationshipCallers = allowedRelationshipCallers != null ? allowedRelationshipCallers : List.of();
+        }
+
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
                 throws ServletException, IOException {
@@ -157,6 +166,17 @@ public class SecurityConfig {
                         response.setCharacterEncoding("UTF-8");
                         response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"The access token 'type' claim must be 'service' for /internal/v1 endpoints\"}}");
                         return;
+                    }
+
+                    if (path.startsWith("/internal/v1/relationships/validate")) {
+                        String caller = jwtAuth.getToken().getSubject();
+                        if (caller == null || !allowedRelationshipCallers.contains(caller)) {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.getWriter().write("{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Caller service is not authorized to access this endpoint\"}}");
+                            return;
+                        }
                     }
                 }
             }
