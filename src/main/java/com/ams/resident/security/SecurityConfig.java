@@ -70,8 +70,9 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
-                .requestMatchers("/api/v1/profiles/me/**", "/api/v1/relationships/me/**").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
-                .requestMatchers("/api/v1/relationships").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
+                .requestMatchers("/api/v1/profiles/me", "/api/v1/profiles/me/**").authenticated()
+                .requestMatchers("/api/v1/relationships/me", "/api/v1/relationships/me/**").authenticated()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/relationships").authenticated()
                 .requestMatchers("/internal/v1/**").authenticated()
                 .anyRequest().authenticated()
             )
