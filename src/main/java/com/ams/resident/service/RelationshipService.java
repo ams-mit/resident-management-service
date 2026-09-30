@@ -124,6 +124,36 @@ public class RelationshipService {
         return mapToResponse(relationship, true);
     }
 
+    public com.ams.resident.dto.RelationshipValidationResponse validateRelationship(String userId, String unitReference, String relationshipTypeStr) {
+        if (!StringUtils.hasText(userId) || !StringUtils.hasText(unitReference) || !StringUtils.hasText(relationshipTypeStr)) {
+            throw new BadRequestException("VALIDATION_ERROR", "userId, unitReference, and relationshipType are required");
+        }
+
+        RelationshipType relationshipType;
+        try {
+            relationshipType = RelationshipType.valueOf(relationshipTypeStr.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("VALIDATION_ERROR", "Invalid relationshipType: " + relationshipTypeStr);
+        }
+
+        List<ApartmentRelationship> relationships = relationshipRepository
+                .findByUserIdAndUnitReferenceAndRelationshipTypeOrderByCreatedAtDesc(userId.trim(), unitReference.trim(), relationshipType);
+
+        if (relationships.isEmpty()) {
+            return new com.ams.resident.dto.RelationshipValidationResponse(false, relationshipType.name(), "NONE");
+        }
+
+        // Check if any matching relationship is APPROVED
+        boolean hasApproved = relationships.stream().anyMatch(r -> r.getStatus() == RelationshipStatus.APPROVED);
+        if (hasApproved) {
+            return new com.ams.resident.dto.RelationshipValidationResponse(true, relationshipType.name(), "APPROVED");
+        }
+
+        // Otherwise return the status of the most recent relationship
+        RelationshipStatus latestStatus = relationships.get(0).getStatus();
+        return new com.ams.resident.dto.RelationshipValidationResponse(false, relationshipType.name(), latestStatus.name());
+    }
+
     private String getAuthenticatedUserId() {
         return SecurityUtils.getCurrentUserId();
     }

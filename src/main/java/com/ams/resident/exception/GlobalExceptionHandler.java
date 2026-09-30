@@ -78,6 +78,16 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(ApiErrorResponse.of("VALIDATION_ERROR", "Malformed JSON request or invalid values"), HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingParams(org.springframework.web.bind.MissingServletRequestParameterException ex, HttpServletRequest request) {
+        return new ResponseEntity<>(ApiErrorResponse.of("VALIDATION_ERROR", "Required parameter missing: " + ex.getParameterName()), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleMethodArgumentTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        return new ResponseEntity<>(ApiErrorResponse.of("VALIDATION_ERROR", "Invalid value for parameter: " + ex.getName()), HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return new ResponseEntity<>(ApiErrorResponse.of("FORBIDDEN", ex.getMessage() != null ? ex.getMessage() : "Access is denied"), HttpStatus.FORBIDDEN);
