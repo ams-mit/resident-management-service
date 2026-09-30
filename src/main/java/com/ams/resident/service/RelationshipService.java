@@ -79,6 +79,51 @@ public class RelationshipService {
         return response;
     }
 
+    @Transactional
+    public RelationshipResponse approveRelationship(String id) {
+        ApartmentRelationship relationship = relationshipRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("RELATIONSHIP_NOT_FOUND", "Relationship not found with id: " + id));
+
+        if (relationship.getStatus() != RelationshipStatus.PENDING) {
+            throw new com.ams.resident.exception.ConflictException("RELATIONSHIP_ALREADY_DECIDED", "Relationship request has already been decided");
+        }
+
+        String adminUserId = getAuthenticatedUserId();
+        relationship.setStatus(RelationshipStatus.APPROVED);
+        relationship.setDecidedBy(adminUserId);
+        relationship.setDecidedAt(java.time.LocalDateTime.now());
+        relationship = relationshipRepository.save(relationship);
+
+        auditService.logEvent("RELATIONSHIP_APPROVED", "RELATIONSHIP", relationship.getId(), adminUserId, "FR-AUD-005: Approved relationship request for unit " + relationship.getUnitReference());
+
+        // TODO: Send notification to user regarding relationship decision once notification ownership is finalized (D8).
+
+        return mapToResponse(relationship, true);
+    }
+
+    @Transactional
+    public RelationshipResponse rejectRelationship(String id, String reason) {
+        ApartmentRelationship relationship = relationshipRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("RELATIONSHIP_NOT_FOUND", "Relationship not found with id: " + id));
+
+        if (relationship.getStatus() != RelationshipStatus.PENDING) {
+            throw new com.ams.resident.exception.ConflictException("RELATIONSHIP_ALREADY_DECIDED", "Relationship request has already been decided");
+        }
+
+        String adminUserId = getAuthenticatedUserId();
+        relationship.setStatus(RelationshipStatus.REJECTED);
+        relationship.setDecisionReason(reason);
+        relationship.setDecidedBy(adminUserId);
+        relationship.setDecidedAt(java.time.LocalDateTime.now());
+        relationship = relationshipRepository.save(relationship);
+
+        auditService.logEvent("RELATIONSHIP_REJECTED", "RELATIONSHIP", relationship.getId(), adminUserId, "FR-AUD-005: Rejected relationship request for unit " + relationship.getUnitReference() + ": " + reason);
+
+        // TODO: Send notification to user regarding relationship decision once notification ownership is finalized (D8).
+
+        return mapToResponse(relationship, true);
+    }
+
     private String getAuthenticatedUserId() {
         return SecurityUtils.getCurrentUserId();
     }

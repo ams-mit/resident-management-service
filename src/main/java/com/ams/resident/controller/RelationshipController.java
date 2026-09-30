@@ -85,4 +85,33 @@ public class RelationshipController {
     public ResponseEntity<ApiResponse<RelationshipResponse>> getRelationshipById(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.of(relationshipService.getRelationshipById(id)));
     }
+
+    @Operation(summary = "Approve relationship (Admin)", description = "Approve a pending apartment relationship request. Restricted to SYSTEM_ADMINISTRATOR.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Relationship approved successfully")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Relationship not found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Relationship already decided")
+    @PatchMapping("/{id}/approve")
+    @PreAuthorize("hasRole('SYSTEM_ADMINISTRATOR')")
+    public ResponseEntity<ApiResponse<RelationshipResponse>> approveRelationship(@PathVariable String id) {
+        RelationshipResponse response = relationshipService.approveRelationship(id);
+        return ResponseEntity.ok(ApiResponse.of(response));
+    }
+
+    @Operation(summary = "Reject relationship (Admin)", description = "Reject a pending apartment relationship request with a mandatory reason. Restricted to SYSTEM_ADMINISTRATOR.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Relationship rejected successfully")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request payload or missing reason")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Valid JWT token required")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Relationship not found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Relationship already decided")
+    @PatchMapping("/{id}/reject")
+    @PreAuthorize("hasRole('SYSTEM_ADMINISTRATOR')")
+    public ResponseEntity<ApiResponse<RelationshipResponse>> rejectRelationship(
+            @PathVariable String id,
+            @Valid @RequestBody com.ams.resident.dto.RelationshipRejectRequest request) {
+        RelationshipResponse response = relationshipService.rejectRelationship(id, request.getReason());
+        return ResponseEntity.ok(ApiResponse.of(response));
+    }
 }
