@@ -1,0 +1,797 @@
+openapi: 3.0.3
+info:
+  title: Resident Management Service API
+  description: API for managing resident profiles, apartment relationships, and inter-service relationship verification in the Apartment Management System (Group 1).
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081
+    description: Local development server
+
+paths:
+  /api/v1/profiles/me:
+    get:
+      tags:
+        - Profiles
+      summary: Get own profile
+      description: Retrieves the profile of the currently authenticated user. Lazy-creates baseline profile if none exists.
+      security:
+        - UserJwtAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileApiResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+    put:
+      tags:
+        - Profiles
+      summary: Edit own profile
+      description: Updates the profile of the currently authenticated user.
+      security:
+        - UserJwtAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileApiResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/profiles/me/email-change:
+    post:
+      tags:
+        - Profiles
+      summary: Request email change
+      description: Initiates a request to change the user's primary email. Logs verification token for local dev and stores hashed token.
+      security:
+        - UserJwtAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailChangeRequest'
+      responses:
+        '202':
+          description: Verification required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageApiResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/profiles/me/email-change/confirm:
+    put:
+      tags:
+        - Profiles
+      summary: Confirm email change
+      description: Confirms an email change request using a verification token and updates identity-access-service.
+      security:
+        - UserJwtAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailChangeConfirmRequest'
+      responses:
+        '200':
+          description: Email updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageApiResponse'
+        '400':
+          description: Invalid or expired verification token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '503':
+          description: Identity dependency unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/profiles/{userId}:
+    get:
+      tags:
+        - Profiles (Admin)
+      summary: Get user profile by ID
+      description: Retrieves the profile of a specific user. Restricted to SYSTEM_ADMINISTRATOR.
+      security:
+        - UserJwtAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of user whose profile is to be retrieved
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileApiResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/relationships:
+    post:
+      tags:
+        - Relationships
+      summary: Create relationship request
+      description: Submit a request to establish a relationship with an apartment unit.
+      security:
+        - UserJwtAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipRequest'
+      responses:
+        '201':
+          description: Relationship request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipApiResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+    get:
+      tags:
+        - Relationships (Admin)
+      summary: List relationships
+      description: Paged list of relationship requests with optional status filtering. Restricted to SYSTEM_ADMINISTRATOR.
+      security:
+        - UserJwtAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED]
+          description: Filter by request status
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Zero-based page index
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size (1 to 100)
+      responses:
+        '200':
+          description: Paged list of relationships
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedRelationshipApiResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/relationships/me:
+    get:
+      tags:
+        - Relationships
+      summary: Get own relationships
+      description: Retrieves all apartment relationships for the currently authenticated user.
+      security:
+        - UserJwtAuth: []
+      responses:
+        '200':
+          description: Relationships retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipListApiResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/relationships/{id}:
+    get:
+      tags:
+        - Relationships (Admin)
+      summary: Get relationship by ID
+      description: Retrieves details of an apartment relationship request including unitValidation placeholder. Restricted to SYSTEM_ADMINISTRATOR.
+      security:
+        - UserJwtAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Relationship ID
+      responses:
+        '200':
+          description: Relationship retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipApiResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Relationship not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/relationships/{id}/approve:
+    patch:
+      tags:
+        - Relationships (Admin)
+      summary: Approve relationship
+      description: Approves a pending relationship request and logs FR-AUD-005 audit event. Restricted to SYSTEM_ADMINISTRATOR.
+      security:
+        - UserJwtAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Relationship ID
+      responses:
+        '200':
+          description: Relationship approved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipApiResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Relationship not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '409':
+          description: Relationship already decided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /api/v1/relationships/{id}/reject:
+    patch:
+      tags:
+        - Relationships (Admin)
+      summary: Reject relationship
+      description: Rejects a pending relationship request with mandatory reason and logs FR-AUD-005 audit event. Restricted to SYSTEM_ADMINISTRATOR.
+      security:
+        - UserJwtAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Relationship ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipRejectRequest'
+      responses:
+        '200':
+          description: Relationship rejected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipApiResponse'
+        '400':
+          description: Validation error or missing reason
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '404':
+          description: Relationship not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '409':
+          description: Relationship already decided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /internal/v1/relationships/validate:
+    get:
+      tags:
+        - Internal Verification
+      summary: Validate relationship for internal services
+      description: Validates whether a user has an approved relationship with a unit. Requires service JWT from an allowed caller.
+      security:
+        - ServiceJwtAuth: []
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: User ID to validate
+        - name: unitReference
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Apartment unit reference
+        - name: relationshipType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [OWNER, TENANT_RESIDENT]
+          description: Relationship type
+      responses:
+        '200':
+          description: Validation check completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipValidationApiResponse'
+        '400':
+          description: Validation error or missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: Unauthorized - Service token required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden - Caller service not in allow-list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+components:
+  securitySchemes:
+    UserJwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RSA-signed JWT issued by Gateway for authenticated users (claims type='user', roles=[...]).
+    ServiceJwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RSA-signed JWT for inter-service communication (claims type='service', sub='service-name').
+
+  schemas:
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: safe message
+    ApiErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiError'
+
+    PagedMeta:
+      type: object
+      required:
+        - page
+        - size
+        - totalElements
+      properties:
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 42
+
+    ProfileRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phone:
+          type: string
+          example: "+1-555-123456"
+        emergencyContact:
+          type: string
+          example: "+1-555-654321"
+
+    ProfileResponse:
+      type: object
+      properties:
+        profileId:
+          type: string
+          example: prof_12345
+        userId:
+          type: string
+          example: usr_67890
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phone:
+          type: string
+          example: "+1-555-123456"
+        emergencyContact:
+          type: string
+          example: "+1-555-654321"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProfileApiResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/ProfileResponse'
+        meta:
+          type: object
+
+    EmailChangeRequest:
+      type: object
+      required:
+        - newEmail
+      properties:
+        newEmail:
+          type: string
+          format: email
+          example: newemail@example.com
+
+    EmailChangeConfirmRequest:
+      type: object
+      required:
+        - verificationToken
+      properties:
+        verificationToken:
+          type: string
+          example: a1b2c3d4e5f6...
+
+    MessageData:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: Verification required
+
+    MessageApiResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/MessageData'
+        meta:
+          type: object
+
+    RelationshipRequest:
+      type: object
+      required:
+        - relationshipType
+        - unitReference
+      properties:
+        relationshipType:
+          type: string
+          enum: [OWNER, TENANT_RESIDENT]
+          example: TENANT_RESIDENT
+        unitReference:
+          type: string
+          example: UNIT-101
+        supportingInfo:
+          type: string
+          example: Signed lease agreement attached
+
+    RelationshipRejectRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          example: Invalid lease agreement
+
+    UnitValidationResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: NOT_AVAILABLE
+        reason:
+          type: string
+          example: Group 2 unit/occupancy contract not yet agreed
+
+    RelationshipResponse:
+      type: object
+      properties:
+        relationshipId:
+          type: string
+          example: rel_abcdef
+        requesterUserId:
+          type: string
+          example: usr_123
+        relationshipType:
+          type: string
+          enum: [OWNER, TENANT_RESIDENT]
+          example: TENANT_RESIDENT
+        unitReference:
+          type: string
+          example: UNIT-101
+        supportingInfo:
+          type: string
+          example: Signed lease agreement
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+          example: PENDING
+        decisionReason:
+          type: string
+          example: Invalid lease agreement
+        decidedBy:
+          type: string
+          example: admin_456
+        decidedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        unitValidation:
+          $ref: '#/components/schemas/UnitValidationResponse'
+
+    RelationshipApiResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/RelationshipResponse'
+        meta:
+          type: object
+
+    RelationshipListApiResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationshipResponse'
+        meta:
+          type: object
+
+    PagedRelationshipApiResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationshipResponse'
+        meta:
+          $ref: '#/components/schemas/PagedMeta'
+
+    RelationshipValidationResponse:
+      type: object
+      required:
+        - verified
+        - relationshipType
+        - status
+      properties:
+        verified:
+          type: boolean
+          example: true
+        relationshipType:
+          type: string
+          example: TENANT_RESIDENT
+        status:
+          type: string
+          enum: [APPROVED, PENDING, REJECTED, NONE]
+          example: APPROVED
+
+    RelationshipValidationApiResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/RelationshipValidationResponse'
+        meta:
+          type: object

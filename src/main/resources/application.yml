@@ -1,0 +1,63 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: resident-management-service
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/resident_management_db}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: ${PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+
+gateway:
+  base-url: ${GATEWAY_BASE_URL:http://localhost:8000}
+  jwt:
+    public-key: ${GATEWAY_JWT_PUBLIC_KEY}
+
+service:
+  name: ${SERVICE_NAME:resident-management-service}
+  jwt:
+    private-key: ${SERVICE_JWT_PRIVATE_KEY:}
+    expires-in: ${SERVICE_JWT_EXPIRES_IN:5m}
+
+client:
+  connect-timeout-ms: ${CLIENT_CONNECT_TIMEOUT_MS:3000}
+  read-timeout-ms: ${CLIENT_READ_TIMEOUT_MS:5000}
+
+internal-api:
+  allowed-callers:
+    relationship-validation:
+      - property-unit-service
+      - lease-occupancy-service
+      - billing-payment-service
+      - utility-charge-service
+      - operations-service
+      - community-service

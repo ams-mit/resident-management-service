@@ -1,0 +1,116 @@
+package com.ams.resident.security;
+
+import com.ams.resident.controller.ProfileController;
+import com.ams.resident.controller.RelationshipController;
+import com.ams.resident.service.ProfileService;
+import com.ams.resident.service.RelationshipService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest({ProfileController.class, RelationshipController.class})
+@Import(SecurityConfig.class)
+@ActiveProfiles("test")
+public class SecurityRegressionTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private ProfileService profileService;
+
+    @MockBean
+    private RelationshipService relationshipService;
+
+    @Test
+    void shouldReturnUnauthorizedWhenNoToken() throws Exception {
+        mockMvc.perform(get("/api/v1/profiles/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.error.message").exists());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenInsufficientRole() throws Exception {
+        mockMvc.perform(get("/api/v1/relationships")
+                        .with(jwt().jwt(builder -> builder.subject("user123").claim("type", "user"))))
+                // Admin relationship listing requires SYSTEM_ADMINISTRATOR. A plain token without roles will be forbidden.
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.error.message").exists());
+    }
+
+    @Test
+    void shouldReturnNotFoundOrUnauthorizedForOldTestTokenRoute() throws Exception {
+        // The route /api/v1/auth/test-token must NOT be available.
+        mockMvc.perform(get("/api/v1/auth/test-token"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldAllowAccessWhenAuthorized() throws Exception {
+        when(relationshipService.getRelationships(any(), any())).thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/v1/relationships")
+                        .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SYSTEM_ADMINISTRATOR"))
+                                .jwt(builder -> builder.subject("admin").claim("roles", List.of("SYSTEM_ADMINISTRATOR")).claim("type", "user"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldRejectServiceTokenOnUserApiEndpoint() throws Exception {
+        // a) service token on /api/v1/profiles/me -> 401
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(jwt().jwt(builder -> builder
+                                .subject("service-caller")
+                                .claim("type", "service")
+                                .claim("roles", List.of("TENANT_RESIDENT")))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void shouldRejectTokenWithMissingTypeOnUserApiEndpoint() throws Exception {
+        // b) token with missing type -> 401
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(jwt().jwt(builder -> builder
+                                .subject("user123")
+                                .claim("roles", List.of("TENANT_RESIDENT")))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void shouldRejectTokenWithUnknownTypeOnUserApiEndpoint() throws Exception {
+        // c) token with unknown type -> 401
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(jwt().jwt(builder -> builder
+                                .subject("user123")
+                                .claim("type", "unknown")
+                                .claim("roles", List.of("TENANT_RESIDENT")))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void shouldAllowValidUserTokenOnUserApiEndpoint() throws Exception {
+        // d) valid user token on /api/v1/profiles/me -> not 401
+        mockMvc.perform(get("/api/v1/profiles/me")
+                        .with(com.ams.resident.util.TestJwtHelper.userJwt("user123")))
+                .andExpect(status().isOk());
+    }
+}
