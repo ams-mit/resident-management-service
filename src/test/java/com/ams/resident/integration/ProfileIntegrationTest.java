@@ -141,7 +141,8 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         ProfileRepository mockRepo = org.mockito.Mockito.mock(ProfileRepository.class);
         AuditService mockAudit = org.mockito.Mockito.mock(AuditService.class);
         IdentityClient mockIdentity = org.mockito.Mockito.mock(IdentityClient.class);
-        ProfileService service = new ProfileService(mockRepo, mockAudit, mockIdentity);
+        com.ams.resident.repository.EmailChangeRequestRepository mockEmailRepo = org.mockito.Mockito.mock(com.ams.resident.repository.EmailChangeRequestRepository.class);
+        ProfileService service = new ProfileService(mockRepo, mockEmailRepo, mockAudit, mockIdentity);
 
         String userId = "concurrent-user";
         ResidentProfile existingProfile = new ResidentProfile();

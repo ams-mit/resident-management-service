@@ -6,6 +6,7 @@ import com.ams.resident.dto.RelationshipResponse;
 import com.ams.resident.dto.UnitValidationResponse;
 import com.ams.resident.entity.ApartmentRelationship;
 import com.ams.resident.entity.RelationshipStatus;
+import com.ams.resident.entity.RelationshipType;
 import com.ams.resident.exception.BadRequestException;
 import com.ams.resident.exception.ResourceNotFoundException;
 import com.ams.resident.repository.ApartmentRelationshipRepository;
