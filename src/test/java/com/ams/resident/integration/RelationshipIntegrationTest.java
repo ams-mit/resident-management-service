@@ -68,9 +68,9 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
                         .content(payload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.relationshipType").value("TENANT_RESIDENT"))
-                .andExpect(jsonPath("$.unitReference").value("UNIT-101"));
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.relationshipType").value("TENANT_RESIDENT"))
+                .andExpect(jsonPath("$.data.unitReference").value("UNIT-101"));
 
         // Verify Persistence
         var relationships = relationshipRepository.findByUserId(TEST_USER_ID);
@@ -108,9 +108,9 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
                         .content(payload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.relationshipType").value("TENANT_RESIDENT"))
-                .andExpect(jsonPath("$.unitReference").value("UNIT-999"));
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.relationshipType").value("TENANT_RESIDENT"))
+                .andExpect(jsonPath("$.data.unitReference").value("UNIT-999"));
 
         // Verify Persistence
         assert relationshipRepository.findByUserId(TEST_USER_ID).size() == 1;
@@ -129,8 +129,9 @@ public class RelationshipIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/relationships/me")
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].unitReference").value("UNIT-202"));
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].unitReference").value("UNIT-202"))
+                .andExpect(jsonPath("$.meta").isMap());
     }
 
     @Test

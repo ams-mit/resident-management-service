@@ -49,25 +49,55 @@ public class SecurityConfig {
     @Value("${gateway.jwt.public-key}")
     private String publicKeyStr;
 
+    @Value("${internal-api.allowed-callers.relationship-validation:property-unit-service,lease-occupancy-service,billing-payment-service,utility-charge-service,operations-service,community-service}")
+    private List<String> allowedRelationshipCallers;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"Authentication required or invalid token\"}}");
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Access is denied\"}}");
+                })
+            )
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
-                .requestMatchers("/api/v1/profiles/me/**", "/api/v1/relationships/me/**").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
-                .requestMatchers("/api/v1/relationships").hasAnyRole("TENANT_RESIDENT", "OWNER", "APARTMENT_MANAGER", "SYSTEM_ADMINISTRATOR", "SYSTEM_ADMIN")
+                .requestMatchers("/api/v1/profiles/me", "/api/v1/profiles/me/**").authenticated()
+                .requestMatchers("/api/v1/relationships/me", "/api/v1/relationships/me/**").authenticated()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/relationships").authenticated()
                 .requestMatchers("/internal/v1/**").authenticated()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"Authentication required or invalid token\"}}");
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Access is denied\"}}");
+                })
                 .jwt(jwt -> jwt
                     .decoder(jwtDecoder())
                     .jwtAuthenticationConverter(jwtAuthenticationConverter())
                 )
             )
-            .addFilterAfter(new TokenTypeFilter(), BearerTokenAuthenticationFilter.class);
+            .addFilterAfter(new TokenTypeFilter(allowedRelationshipCallers), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
@@ -106,7 +136,11 @@ public class SecurityConfig {
 
     public static class TokenTypeFilter extends OncePerRequestFilter {
 
-        private final BearerTokenAuthenticationEntryPoint authenticationEntryPoint = new BearerTokenAuthenticationEntryPoint();
+        private final List<String> allowedRelationshipCallers;
+
+        public TokenTypeFilter(List<String> allowedRelationshipCallers) {
+            this.allowedRelationshipCallers = allowedRelationshipCallers != null ? allowedRelationshipCallers : List.of();
+        }
 
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -119,23 +153,30 @@ public class SecurityConfig {
 
                 if (path.startsWith("/api/v1/")) {
                     if (!"user".equals(type)) {
-                        OAuth2Error error = new OAuth2Error(
-                                BearerTokenErrorCodes.INVALID_TOKEN,
-                                "The access token 'type' claim must be 'user' for /api/v1 endpoints",
-                                null
-                        );
-                        authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.setCharacterEncoding("UTF-8");
+                        response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"The access token 'type' claim must be 'user' for /api/v1 endpoints\"}}");
                         return;
                     }
                 } else if (path.startsWith("/internal/v1/")) {
                     if (!"service".equals(type)) {
-                        OAuth2Error error = new OAuth2Error(
-                                BearerTokenErrorCodes.INVALID_TOKEN,
-                                "The access token 'type' claim must be 'service' for /internal/v1 endpoints",
-                                null
-                        );
-                        authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.setCharacterEncoding("UTF-8");
+                        response.getWriter().write("{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"The access token 'type' claim must be 'service' for /internal/v1 endpoints\"}}");
                         return;
+                    }
+
+                    if (path.startsWith("/internal/v1/relationships/validate")) {
+                        String caller = jwtAuth.getToken().getSubject();
+                        if (caller == null || !allowedRelationshipCallers.contains(caller)) {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.getWriter().write("{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Caller service is not authorized to access this endpoint\"}}");
+                            return;
+                        }
                     }
                 }
             }

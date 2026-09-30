@@ -148,7 +148,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"relationshipType\": \"TENANT\",\n    \"unitReference\": \"UNIT-101\",\n    \"supportingInfo\": \"Lease Agreement Doc\"\n}"
+							"raw": "{\n    \"relationshipType\": \"TENANT_RESIDENT\",\n    \"unitReference\": \"UNIT-101\",\n    \"supportingInfo\": \"Lease Agreement Doc\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/relationships",

@@ -33,3 +33,8 @@ target/
 
 # Environment Variables
 .env
+
+# Keys and Certificates
+*.pem
+*.key
+certs/

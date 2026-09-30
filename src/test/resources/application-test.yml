@@ -47,3 +47,13 @@ gateway:
       lQgqapR/eTb3nQrfnqnDPgU1dnr6k6r0ZiXDF6oGkaYzHCtJMitBtXu6p60mV3Y0
       ywIDAQAB
       -----END PUBLIC KEY-----
+
+internal-api:
+  allowed-callers:
+    relationship-validation:
+      - property-unit-service
+      - lease-occupancy-service
+      - billing-payment-service
+      - utility-charge-service
+      - operations-service
+      - community-service

@@ -68,8 +68,8 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/profiles/me")
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.firstName").value("John"))
-                .andExpect(jsonPath("$.lastName").value("Doe"));
+                .andExpect(jsonPath("$.data.firstName").value("John"))
+                .andExpect(jsonPath("$.data.lastName").value("Doe"));
     }
 
     @Test
@@ -79,8 +79,8 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/profiles/me")
                         .with(TestJwtHelper.userJwt(newUserId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(newUserId))
-                .andExpect(jsonPath("$.statusInfo").value("ACTIVE"));
+                .andExpect(jsonPath("$.data.userId").value(newUserId))
+                .andExpect(jsonPath("$.data.statusInfo").value("ACTIVE"));
 
         // Verify Database Persistence
         var created = profileRepository.findByUserId(newUserId);
@@ -104,7 +104,7 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/profiles/me")
                         .with(TestJwtHelper.userJwt(newUserId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(newUserId));
+                .andExpect(jsonPath("$.data.userId").value(newUserId));
 
         var secondCreated = profileRepository.findByUserId(newUserId).orElseThrow();
         org.junit.jupiter.api.Assertions.assertEquals(initialId, secondCreated.getId());
@@ -126,10 +126,10 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                         .content(updatePayload)
                         .with(TestJwtHelper.userJwt(newUserId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(newUserId))
-                .andExpect(jsonPath("$.firstName").value("Alice"))
-                .andExpect(jsonPath("$.lastName").value("Smith"))
-                .andExpect(jsonPath("$.phone").value("5551234567"));
+                .andExpect(jsonPath("$.data.userId").value(newUserId))
+                .andExpect(jsonPath("$.data.firstName").value("Alice"))
+                .andExpect(jsonPath("$.data.lastName").value("Smith"))
+                .andExpect(jsonPath("$.data.phone").value("5551234567"));
 
         var profile = profileRepository.findByUserId(newUserId).orElseThrow();
         org.junit.jupiter.api.Assertions.assertEquals("Alice", profile.getFirstName());
@@ -141,7 +141,8 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
         ProfileRepository mockRepo = org.mockito.Mockito.mock(ProfileRepository.class);
         AuditService mockAudit = org.mockito.Mockito.mock(AuditService.class);
         IdentityClient mockIdentity = org.mockito.Mockito.mock(IdentityClient.class);
-        ProfileService service = new ProfileService(mockRepo, mockAudit, mockIdentity);
+        com.ams.resident.repository.EmailChangeRequestRepository mockEmailRepo = org.mockito.Mockito.mock(com.ams.resident.repository.EmailChangeRequestRepository.class);
+        ProfileService service = new ProfileService(mockRepo, mockEmailRepo, mockAudit, mockIdentity);
 
         String userId = "concurrent-user";
         ResidentProfile existingProfile = new ResidentProfile();
@@ -176,9 +177,9 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                         .content(updatePayload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.firstName").value("Johnny"))
-                .andExpect(jsonPath("$.lastName").value("Doeson"))
-                .andExpect(jsonPath("$.phone").value("9876543210"));
+                .andExpect(jsonPath("$.data.firstName").value("Johnny"))
+                .andExpect(jsonPath("$.data.lastName").value("Doeson"))
+                .andExpect(jsonPath("$.data.phone").value("9876543210"));
 
         // Verify Database Persistence
         ResidentProfile updated = (ResidentProfile) profileRepository.findByUserId(TEST_USER_ID).orElseThrow();
@@ -211,13 +212,16 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                         .content(updatePayload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors.firstName").exists())
-                .andExpect(jsonPath("$.fieldErrors.lastName").exists());
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
+    @Autowired
+    private com.ams.resident.repository.EmailChangeRequestRepository emailChangeRequestRepository;
+
     @Test
-    void shouldForwardEmailChangeSuccessfully() throws Exception {
-        doNothing().when(identityClient).requestEmailChange(anyString(), anyString());
+    void shouldStorePendingEmailChangeRequestWithHashedToken() throws Exception {
+        emailChangeRequestRepository.deleteAll();
 
         String emailPayload = """
                 {
@@ -225,28 +229,46 @@ public class ProfileIntegrationTest extends AbstractIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/profiles/me/email-change")
+        org.springframework.test.web.servlet.MvcResult result = mockMvc.perform(post("/api/v1/profiles/me/email-change")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(emailPayload)
+                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.message").value("Verification required"))
+                .andExpect(jsonPath("$.meta").isMap())
+                .andReturn();
+
+        // Verify raw token never appears in response body
+        String responseContent = result.getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertFalse(responseContent.contains("token"));
+
+        // Verify row saved in DB with hash
+        java.util.List<com.ams.resident.entity.EmailChangeRequestEntity> requests =
+                emailChangeRequestRepository.findAll().stream()
+                        .filter(r -> TEST_USER_ID.equals(r.getUserId()))
+                        .toList();
+        org.junit.jupiter.api.Assertions.assertEquals(1, requests.size());
+        com.ams.resident.entity.EmailChangeRequestEntity saved = requests.get(0);
+        org.junit.jupiter.api.Assertions.assertEquals("new@example.com", saved.getNewEmail());
+        org.junit.jupiter.api.Assertions.assertNotNull(saved.getTokenHash());
+        org.junit.jupiter.api.Assertions.assertEquals(64, saved.getTokenHash().length());
+        org.junit.jupiter.api.Assertions.assertNull(saved.getUsedAt());
+        org.junit.jupiter.api.Assertions.assertTrue(saved.getExpiresAt().isAfter(java.time.LocalDateTime.now()));
+
+        // Invalidate older unused request when a new one is requested
+        String secondPayload = """
+                {
+                    "newEmail": "second@example.com"
+                }
+                """;
+        mockMvc.perform(post("/api/v1/profiles/me/email-change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(secondPayload)
                         .with(TestJwtHelper.userJwt(TEST_USER_ID)))
                 .andExpect(status().isAccepted());
-    }
 
-    @Test
-    void shouldReturn503WhenIdentityServiceFails() throws Exception {
-        doThrow(new RuntimeException("Identity service offline"))
-                .when(identityClient).requestEmailChange(anyString(), anyString());
-
-        String emailPayload = """
-                {
-                    "newEmail": "new@example.com"
-                }
-                """;
-
-        mockMvc.perform(post("/api/v1/profiles/me/email-change")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(emailPayload)
-                        .with(TestJwtHelper.userJwt(TEST_USER_ID)))
-                .andExpect(status().isInternalServerError()); // Custom Exception handler maps Exception to 500, but let's check
+        com.ams.resident.entity.EmailChangeRequestEntity firstRequest =
+                emailChangeRequestRepository.findById(saved.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(firstRequest.getExpiresAt().isBefore(java.time.LocalDateTime.now().plusSeconds(1)));
     }
 }

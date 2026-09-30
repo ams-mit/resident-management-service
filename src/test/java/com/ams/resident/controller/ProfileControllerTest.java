@@ -39,6 +39,7 @@ public class ProfileControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidEmailPayload))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors.newEmail").exists());
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 }

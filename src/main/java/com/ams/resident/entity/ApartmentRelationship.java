@@ -30,7 +30,14 @@ public class ApartmentRelationship {
     @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.VARCHAR)
     private RelationshipStatus status = RelationshipStatus.PENDING;
     
+    @Column(name = "decision_reason", length = 500)
     private String decisionReason;
+
+    @Column(name = "decided_by")
+    private String decidedBy;
+
+    @Column(name = "decided_at")
+    private java.time.LocalDateTime decidedAt;
 
     @Column(name = "created_at", updatable = false)
     private java.time.LocalDateTime createdAt;

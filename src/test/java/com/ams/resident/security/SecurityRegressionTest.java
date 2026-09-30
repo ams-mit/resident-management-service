@@ -2,25 +2,27 @@ package com.ams.resident.security;
 
 import com.ams.resident.controller.ProfileController;
 import com.ams.resident.controller.RelationshipController;
-import com.ams.resident.controller.ResidentController;
 import com.ams.resident.service.ProfileService;
 import com.ams.resident.service.RelationshipService;
-import com.ams.resident.service.ResidentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.List;
-import org.springframework.test.context.ActiveProfiles;
-
-@WebMvcTest({ProfileController.class, ResidentController.class, RelationshipController.class})
+@WebMvcTest({ProfileController.class, RelationshipController.class})
 @Import(SecurityConfig.class)
 @ActiveProfiles("test")
 public class SecurityRegressionTest {
@@ -32,23 +34,24 @@ public class SecurityRegressionTest {
     private ProfileService profileService;
 
     @MockBean
-    private ResidentService residentService;
-
-    @MockBean
     private RelationshipService relationshipService;
 
     @Test
     void shouldReturnUnauthorizedWhenNoToken() throws Exception {
         mockMvc.perform(get("/api/v1/profiles/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
     void shouldReturnForbiddenWhenInsufficientRole() throws Exception {
-        mockMvc.perform(get("/api/v1/residents")
+        mockMvc.perform(get("/api/v1/relationships")
                         .with(jwt().jwt(builder -> builder.subject("user123").claim("type", "user"))))
-                // The Resident GET API requires APARTMENT_MANAGER or SYSTEM_ADMIN. A plain token without roles will be forbidden.
-                .andExpect(status().isForbidden());
+                // Admin relationship listing requires SYSTEM_ADMINISTRATOR. A plain token without roles will be forbidden.
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -60,9 +63,11 @@ public class SecurityRegressionTest {
 
     @Test
     void shouldAllowAccessWhenAuthorized() throws Exception {
-        // We test an endpoint that is allowed by the role.
-        mockMvc.perform(get("/api/v1/residents")
-                        .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_APARTMENT_MANAGER")).jwt(builder -> builder.subject("admin").claim("roles", List.of("APARTMENT_MANAGER")).claim("type", "user"))))
+        when(relationshipService.getRelationships(any(), any())).thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/v1/relationships")
+                        .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SYSTEM_ADMINISTRATOR"))
+                                .jwt(builder -> builder.subject("admin").claim("roles", List.of("SYSTEM_ADMINISTRATOR")).claim("type", "user"))))
                 .andExpect(status().isOk());
     }
 
@@ -74,7 +79,8 @@ public class SecurityRegressionTest {
                                 .subject("service-caller")
                                 .claim("type", "service")
                                 .claim("roles", List.of("TENANT_RESIDENT")))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -84,7 +90,8 @@ public class SecurityRegressionTest {
                         .with(jwt().jwt(builder -> builder
                                 .subject("user123")
                                 .claim("roles", List.of("TENANT_RESIDENT")))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -95,7 +102,8 @@ public class SecurityRegressionTest {
                                 .subject("user123")
                                 .claim("type", "unknown")
                                 .claim("roles", List.of("TENANT_RESIDENT")))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
