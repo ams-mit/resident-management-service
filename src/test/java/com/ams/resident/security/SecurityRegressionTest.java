@@ -50,7 +50,7 @@ public class SecurityRegressionTest {
     void shouldReturnForbiddenWhenInsufficientRole() throws Exception {
         mockMvc.perform(get("/api/v1/residents")
                         .with(jwt().jwt(builder -> builder.subject("user123").claim("type", "user"))))
-                // The Resident GET API requires APARTMENT_MANAGER or SYSTEM_ADMIN. A plain token without roles will be forbidden.
+                // The Resident GET API requires APARTMENT_MANAGER or SYSTEM_ADMINISTRATOR. A plain token without roles will be forbidden.
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
                 .andExpect(jsonPath("$.error.message").exists());

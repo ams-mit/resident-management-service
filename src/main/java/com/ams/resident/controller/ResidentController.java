@@ -33,23 +33,23 @@ public class ResidentController {
 
     private final ResidentService residentService;
 
-    @Operation(summary = "Create resident", description = "Create a new resident profile. Required Role: APARTMENT_MANAGER or SYSTEM_ADMIN.")
+    @Operation(summary = "Create resident", description = "Create a new resident profile. Required Role: APARTMENT_MANAGER or SYSTEM_ADMINISTRATOR.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Resident created successfully")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request format")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions")
     @PostMapping
-    @PreAuthorize("hasAnyRole('APARTMENT_MANAGER', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('APARTMENT_MANAGER', 'SYSTEM_ADMINISTRATOR')")
     public ResponseEntity<ApiResponse<ResidentResponse>> createResident(@Valid @RequestBody ResidentRequest request) {
         ResidentResponse response = residentService.createResident(request);
         return new ResponseEntity<>(ApiResponse.of(response), HttpStatus.CREATED);
     }
 
-    @Operation(summary = "Get all residents", description = "Retrieve a list of all residents with pagination. Required Role: APARTMENT_MANAGER or SYSTEM_ADMIN.")
+    @Operation(summary = "Get all residents", description = "Retrieve a list of all residents with pagination. Required Role: APARTMENT_MANAGER or SYSTEM_ADMINISTRATOR.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Residents retrieved successfully")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid pagination parameters")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions")
     @GetMapping
-    @PreAuthorize("hasAnyRole('APARTMENT_MANAGER', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('APARTMENT_MANAGER', 'SYSTEM_ADMINISTRATOR')")
     public ResponseEntity<ApiResponse<List<ResidentResponse>>> getResidents(
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size) {
@@ -110,7 +110,7 @@ public class ResidentController {
     @Operation(summary = "Update resident status", description = "Update the status of a resident. Currently blocked by canonical schema requirements.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "501", description = "Not Implemented")
     @PatchMapping("/{residentId}/status")
-    @PreAuthorize("hasAnyRole('APARTMENT_MANAGER', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('APARTMENT_MANAGER', 'SYSTEM_ADMINISTRATOR')")
     public ResponseEntity<Void> updateResidentStatus(@PathVariable String residentId) {
         // BLOCKED: The approved schema (V1__init_schema.sql) strictly omits a status column for profiles.
         // Inventing a status field or transition rule is expressly prohibited by the requirements.
@@ -123,6 +123,6 @@ public class ResidentController {
         
         return authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_APARTMENT_MANAGER") || 
-                               a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
+                               a.getAuthority().equals("ROLE_SYSTEM_ADMINISTRATOR"));
     }
 }

@@ -13,7 +13,7 @@ public class RelationshipResponse {
     @Schema(description = "Unique identifier of the relationship", example = "rel_abcdef")
     private String relationshipId;
     
-    @Schema(description = "Type of relationship", example = "TENANT")
+    @Schema(description = "Type of relationship", example = "TENANT_RESIDENT")
     private RelationshipType relationshipType;
     
     @Schema(description = "The reference ID of the apartment unit", example = "UNIT-101")

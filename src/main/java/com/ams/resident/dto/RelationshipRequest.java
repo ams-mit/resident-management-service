@@ -12,7 +12,7 @@ import lombok.Setter;
 @Schema(description = "Request payload for creating a new relationship with a unit")
 public class RelationshipRequest {
     @NotNull
-    @Schema(description = "Type of relationship to establish (e.g. OWNER, TENANT)", example = "TENANT", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Type of relationship to establish (e.g. OWNER, TENANT_RESIDENT)", example = "TENANT_RESIDENT", requiredMode = Schema.RequiredMode.REQUIRED)
     private RelationshipType relationshipType;
     
     @NotBlank
